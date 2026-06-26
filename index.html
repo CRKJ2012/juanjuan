@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
+  <title>gorenje · 出入库管理系统</title>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js">
+  </script>
+  <style>
+    :root {
+      --bg: #f5f6fa;
+      --card: #ffffff;
+      --text: #2d3436;
+      --text-light: #636e72;
+      --border: #e0e3e8;
+      --accent: #2d3436;
+      --accent-hover: #1a1e24;
+      --danger: #d63031;
+      --shadow: 0 2px 16px rgba(0, 0, 0, 0.06);
+      --radius: 12px;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Inter', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      background: var(--bg);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      color: var(--text);
+    }
+
+    /* 启动画面 */
+    .splash {
+      position: fixed;
+      inset: 0;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      animation: splashOut 0.5s ease 2.8s forwards;
+    }
+    .splash .logo {
+      font-size: clamp(3rem, 8vw, 5.5rem);
+      font-weight: 700;
+      letter-spacing: 10px;
+      color: #1a1a1a;
+      text-transform: lowercase;
+      animation: pulse 2.2s ease-in-out infinite;
+    }
+    .splash .copyright {
+      position: absolute;
+      bottom: 28px;
+      font-size: 12px;
+      color: #b0b8c0;
+      letter-spacing: 1px;
+    }
+    @keyframes pulse {
+      0%,
+      100% {
+        transform: scale(1);
+        opacity: 0.85;
+      }
+      50% {
+        transform: scale(1.04);
+        opacity: 1;
+      }
+    }
+    @keyframes splashOut {
+      0% {
+        opacity: 1;
+        visibility: visible;
+      }
+      99% {
+        opacity: 0;
+      }
+      100% {
+        opacity: 0;
+        visibility: hidden;
+      }
+    }
+
+    /* 主应用 */
+    .app {
+      display: none;
+      width: 100%;
+      max-width: 1300px;
+      background: var(--card);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .app.show {
+      display: block;
+    }
+
+    /* 认证卡片 */
+    .auth-card {
+      max-width: 420px;
+      margin: 60px auto;
+      padding: 48px 36px;
+      text-align: center;
+      background: var(--card);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+    }
+    .auth-card h2 {
+      font-weight: 600;
+      font-size: 1.5rem;
+      margin-bottom: 28px;
+      color: var(--text);
+      letter-spacing: 2px;
+    }
+    .auth-card .field {
+      margin-bottom: 14px;
+      text-align: left;
+    }
+    .auth-card label {
+      display: block;
+      font-size: 13px;
+      color: var(--text-light);
+      margin-bottom: 5px;
+    }
+    .auth-card input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      font-size: 14px;
+      outline: none;
+      transition: 0.2s;
+    }
+    .auth-card input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(45, 52, 54, 0.08);
+    }
+    .auth-card .btn {
+      width: 100%;
+      padding: 13px;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: 0.2s;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+    }
+    .btn-primary:hover {
+      background: var(--accent-hover);
+    }
+    .btn-secondary {
+      background: #f1f2f6;
+      color: var(--text);
+    }
+    .btn-secondary:hover {
+      background: #e4e6eb;
+    }
+    .error-text {
+      color: var(--danger);
+      font-size: 13px;
+      margin-top: 8px;
+      min-height: 20px;
+    }
+
+    /* 主界面头部 */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 18px 28px;
+      border-bottom: 1px solid var(--border);
+    }
+    .header .brand {
+      font-size: 1.2rem;
+      font-weight: 600;
+      letter-spacing: 2px;
+    }
+    .header .user-info {
+      font-size: 13px;
+      color: var(--text-light);
+    }
+    .header .logout-link {
+      color: var(--danger);
+      cursor: pointer;
+      margin-left: 12px;
+      text-decoration: none;
+    }
+
+    /* 导航标签 */
+    .nav-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      padding: 14px 24px;
+      border-bottom: 1px solid var(--border);
+      background: #fafbfc;
+    }
+    .nav-tab {
+      padding: 8px 16px;
+      border: 1px solid transparent;
+      background: transparent;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-light);
+      transition: 0.2s;
+      white-space: nowrap;
+    }
+    .nav-tab:hover {
+      background: #f0f1f5;
+    }
+    .nav-tab.active {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+
+    /* 内容区 */
+    .content {
+      padding: 24px 28px;
+    }
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .toolbar button {
+      padding: 9px 20px;
+      border: 1.5px solid var(--border);
+      background: white;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: 0.2s;
+    }
+    .toolbar button:hover {
+      background: #f8f9fb;
+    }
+    .toolbar .btn-fill {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+    .toolbar .btn-fill:hover {
+      background: var(--accent-hover);
+    }
+
+    /* 记录卡片列表（列显示） */
+    .records-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .record-card {
+      background: #fafbfd;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px 20px;
+      align-items: flex-start;
+      transition: 0.2s;
+    }
+    .record-card:hover {
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+    }
+    .record-field {
+      display: flex;
+      flex-direction: column;
+      min-width: 110px;
+      flex: 1 1 140px;
+      max-width: 200px;
+    }
+    .record-field label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-light);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+      white-space: nowrap;
+    }
+    .record-field input,
+    .record-field select {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 13px;
+      background: white;
+      outline: none;
+      transition: 0.2s;
+    }
+    .record-field input:focus,
+    .record-field select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(45, 52, 54, 0.06);
+    }
+    .record-field input[readonly] {
+      background: #f5f5f5;
+      color: #888;
+    }
+    .record-actions {
+      display: flex;
+      align-items: flex-end;
+      gap: 6px;
+      padding-bottom: 2px;
+      flex-shrink: 0;
+    }
+    .record-actions button {
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      background: white;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: 0.2s;
+    }
+    .record-actions .btn-del {
+      color: var(--danger);
+      border-color: #fdd;
+    }
+    .record-actions .btn-del:hover {
+      background: #fff5f5;
+    }
+
+    /* 响应式 */
+    @media (max-width: 768px) {
+      .record-field {
+        min-width: 90px;
+        flex: 1 1 100px;
+        max-width: 150px;
+      }
+    }
+
+    .footer-text {
+      text-align: right;
+      padding: 10px 28px;
+      font-size: 11px;
+      color: #b0b8c0;
+      border-top: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 启动动画 -->
+  <div class="splash" id="splashScreen">
+    <div class="logo">gorenje</div>
+    <div class="copyright">灿然科技@2026 版权所有</div>
+  </div>
+
+  <!-- 主应用容器 -->
+  <div class="app" id="appContainer">
+    <div id="appInner"></div>
+    <div class="footer-text">灿然科技@2026 版权所有</div>
+  </div>
+
+  <script>
+    (function() {
+      // ==================== 配置 ====================
+      const APP_VERSION = '3.0';
+      const SESSION_USER_KEY = 'gorenje_session_user';
+      const SESSION_REMEMBER_KEY = 'gorenje_session_remember';
+      const USERS_KEY = 'gorenje_users_db';
+      const VERSION_KEY = 'gorenje_data_version';
+
+      // 默认用户
+      const DEFAULT_USERS = [{ username: 'admin', password: 'admin123' }];
+
+      // 各模块存储键
+      const STORE_KEYS = {
+        purchase: 'gorenje_purchase_in',
+        purchaseExchange: 'gorenje_purchase_ex',
+        purchaseReturn: 'gorenje_purchase_ret',
+        retailOrder: 'gorenje_retail_order',
+        retailBill: 'gorenje_retail_bill',
+        retailExchange: 'gorenje_retail_ex',
+        retailReturn: 'gorenje_retail_ret',
+        inventory: 'gorenje_inventory',
+        sampleRegister: 'gorenje_sample_reg',
+        sampleSale: 'gorenje_sample_sale'
+      };
+
+      // ==================== 字段定义（带下拉选项） ====================
+      function getFields(moduleKey) {
+        const commonBool = ['是', '否'];
+        const warehouse = ['新库房', '老库房'];
+        const channels = ['佳洛顺驰', '洛高', '商场', '个人'];
+        const posBelong = ['佳洛顺驰', '洛高'];
+
+        const purchaseBase = [
+          { name: '单号', type: 'text', readonly: true },
+          { name: '供应商', type: 'text' },
+          { name: '采购日期', type: 'date' },
+          { name: '收货日期', type: 'date' },
+          { name: '商品品牌', type: 'text' },
+          { name: '商品名称', type: 'text' },
+          { name: '商品型号', type: 'text' },
+          { name: '数量', type: 'number' },
+          { name: '单价', type: 'number' },
+          { name: '金额', type: 'number', readonly: true, computed: true },
+          { name: '是否已开票', type: 'select', options: commonBool },
+          { name: '开票金额', type: 'number' },
+          { name: '开票日期', type: 'date' },
+          { name: '归属仓库', type: 'select', options: warehouse },
+          { name: '备注', type: 'text' }
+        ];
+
+        const retailBase = [
+          { name: '单号', type: 'text', readonly: true },
+          { name: '订单来源', type: 'select', options: channels },
+          { name: '订单日期', type: 'date' },
+          { name: '客户姓名', type: 'text' },
+          { name: '联系电话', type: 'text' },
+          { name: '销售人员', type: 'text' },
+          { name: '销售渠道', type: 'select', options: channels },
+          { name: '商品名称', type: 'text' },
+          { name: '商品规格型号', type: 'text' },
+          { name: '销售价格', type: 'number' },
+          { name: '零售价格', type: 'number' },
+          { name: '折扣', type: 'text' },
+          { name: '收款方式', type: 'select', options: channels },
+          { name: '收款金额', type: 'number' },
+          { name: '是否有尾款', type: 'text' },
+          { name: '是否国补', type: 'select', options: commonBool },
+          { name: 'POS机归属', type: 'select', options: posBelong },
+          { name: 'POS机交易金额', type: 'number' },
+          { name: '补贴金额', type: 'number' },
+          { name: 'POS机交易日期', type: 'date' },
+          { name: '安装地址', type: 'text' },
+          { name: '是否安装', type: 'select', options: commonBool },
+          { name: '安装日期', type: 'date' },
+          { name: '安装是否录系统', type: 'select', options: commonBool },
+          { name: '是否录销量', type: 'select', options: commonBool },
+          { name: '录销量日期', type: 'date' },
+          { name: '是否开发票', type: 'select', options: commonBool },
+          { name: '开票日期', type: 'date' },
+          { name: '进货价', type: 'number' },
+          { name: '利润', type: 'number', readonly: true, computed: true },
+          { name: '备注', type: 'text' }
+        ];
+
+        const inventoryBase = [
+          { name: '商品品牌', type: 'text' },
+          { name: '商品名称', type: 'text' },
+          { name: '商品型号', type: 'text' },
+          { name: '账面库存', type: 'number' },
+          { name: '销售订货', type: 'number' },
+          { name: '可用库存', type: 'number' },
+          { name: '归属仓库', type: 'select', options: warehouse }
+        ];
+
+        const sampleRegBase = [
+          { name: '单号', type: 'text', readonly: true },
+          { name: '上样门店地址', type: 'text' },
+          { name: '上样日期', type: 'date' },
+          { name: '商品品牌', type: 'text' },
+          { name: '商品名称', type: 'text' },
+          { name: '商品型号', type: 'text' },
+          { name: '数量', type: 'number' },
+          { name: '价格', type: 'number' },
+          { name: '金额', type: 'number', readonly: true, computed: true },
+          { name: '负责人', type: 'text' }
+        ];
+
+        const fieldMap = {
+          purchase: purchaseBase,
+          purchaseExchange: purchaseBase,
+          purchaseReturn: purchaseBase,
+          retailOrder: retailBase,
+          retailBill: retailBase,
+          retailExchange: retailBase,
+          retailReturn: retailBase,
+          inventory: inventoryBase,
+          sampleRegister: sampleRegBase,
+          sampleSale: retailBase
+        };
+
+        return fieldMap[moduleKey] || purchaseBase;
+      }
+
+      // 模块配置
+      function getModuleConfig(moduleKey) {
+        const configs = {
+          purchase: { label: '采购入库', prefix: 'CG' },
+          purchaseExchange: { label: '采购换货', prefix: 'CH' },
+          purchaseReturn: { label: '采购退货', prefix: 'CT' },
+          retailOrder: { label: '零售订单', prefix: 'DD' },
+          retailBill: { label: '零售开单', prefix: 'KD' },
+          retailExchange: { label: '零售换货', prefix: 'HH' },
+          retailReturn: { label: '零售退货', prefix: 'TH' },
+          inventory: { label: '库存日报', prefix: 'KC' },
+          sampleRegister: { label: '门店上样', prefix: 'SY' },
+          sampleSale: { label: '样机销售', prefix: 'XS' }
+        };
+        return configs[moduleKey] || { label: moduleKey, prefix: 'XX' };
+      }
+
+      // ==================== 数据操作 ====================
+      function getStoreData(key) {
+        try {
+          const raw = localStorage.getItem(key);
+          return raw ? JSON.parse(raw) : [];
+        } catch (e) {
+          return [];
+        }
+      }
+
+      function setStoreData(key, data) {
+        localStorage.setItem(key, JSON.stringify(data));
+      }
+
+      function getUsers() {
+        return getStoreData(USERS_KEY).length > 0 ? getStoreData(USERS_KEY) : DEFAULT_USERS;
+      }
+
+      function saveUsers(users) {
+        setStoreData(USERS_KEY, users);
+      }
+
+      function getSessionUser() {
+        const raw = sessionStorage.getItem(SESSION_USER_KEY);
+        return raw ? JSON.parse(raw) : null;
+      }
+
+      function setSessionUser(user) {
+        sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(user));
+      }
+
+      function clearSession() {
+        sessionStorage.removeItem(SESSION_USER_KEY);
+        sessionStorage.removeItem(SESSION_REMEMBER_KEY);
+      }
+
+      function getRemembered() {
+        const raw = sessionStorage.getItem(SESSION_REMEMBER_KEY);
+        return raw ? JSON.parse(raw) : null;
+      }
+
+      function setRemembered(creds) {
+        sessionStorage.setItem(SESSION_REMEMBER_KEY, JSON.stringify(creds));
+      }
+
+      // ==================== 单号生成 ====================
+      function generateCode(prefix, records) {
+        const maxNum = records.reduce((max, r) => {
+          if (r['单号'] && typeof r['单号'] === 'string' && r['单号'].startsWith(prefix)) {
+            const num = parseInt(r['单号'].substring(prefix.length));
+            return isNaN(num) ? max : Math.max(max, num);
+          }
+          return max;
+        }, 0);
+        return prefix + String(maxNum + 1).padStart(4, '0');
+      }
+
+      // ==================== 认证逻辑 ====================
+      function validateUsername(u) { return /^[a-zA-Z]+$/.test(u); }
+
+      function validatePassword(p) { return /^(?=.*[0-9])(?=.*[a-z])[a-z0-9]+$/.test(p); }
+
+      function doLogin(username, password, remember) {
+        if (!validateUsername(username)) throw new Error('账号必须是全英文！');
+        if (!validatePassword(password)) throw new Error('密码必须包含数字和小写字母！');
+        const users = getUsers();
+        const user = users.find(u => u.username === username && u.password === password);
+        if (!user) throw new Error('账号或密码错误！');
+        setSessionUser(user);
+        if (remember) {
+          setRemembered({ username, password });
+        } else {
+          sessionStorage.removeItem(SESSION_REMEMBER_KEY);
+        }
+        return user;
+      }
+
+      function doRegister(username, password) {
+        if (!validateUsername(username)) throw new Error('账号必须是全英文！');
+        if (!validatePassword(password)) throw new Error('密码必须包含数字和小写字母！');
+        const users = getUsers();
+        if (users.find(u => u.username === username)) throw new Error('账号已存在！');
+        users.push({ username, password });
+        saveUsers(users);
+      }
+
+      // ==================== 渲染 ====================
+      function renderAuth() {
+        const remembered = getRemembered();
+        const remUser = remembered ? remembered.username : '';
+        const remPass = remembered ? remembered.password : '';
+        const remChecked = remembered ? 'checked' : '';
+
+        return `
+        <div class="auth-card">
+          <h2>gorenje 管理登录</h2>
+          <div class="field">
+            <label>账号</label>
+            <input type="text" id="authUser" placeholder="全英文账号" value="${remUser}" autocomplete="off">
+          </div>
+          <div class="field">
+            <label>密码</label>
+            <input type="password" id="authPass" placeholder="数字+小写字母" value="${remPass}" autocomplete="off">
+          </div>
+          <div class="field" style="display:flex;align-items:center;gap:8px;">
+            <input type="checkbox" id="authRemember" ${remChecked} style="width:auto;">
+            <label style="margin:0;font-size:13px;">记住密码（重启电脑后清除）</label>
+          </div>
+          <button class="btn btn-primary" id="btnLogin">登 录</button>
+          <button class="btn btn-secondary" id="btnRegister">注册新账号</button>
+          <div class="error-text" id="authError"></div>
+        </div>
+      `;
+      }
+
+      function renderMain(user) {
+        const modules = [
+          'purchase', 'purchaseExchange', 'purchaseReturn',
+          'retailOrder', 'retailBill', 'retailExchange', 'retailReturn',
+          'inventory', 'sampleRegister', 'sampleSale'
+        ];
+
+        const tabsHTML = modules.map((mk, i) => {
+          const cfg = getModuleConfig(mk);
+          return `<button class="nav-tab ${i===0?'active':''}" data-module="${mk}">${cfg.label}</button>`;
+        }).join('');
+
+        return `
+        <div class="header">
+          <span class="brand">gorenje 出入库管理</span>
+          <span class="user-info">
+            👤 ${user.username}
+            <span class="logout-link" id="btnLogout">退出登录</span>
+          </span>
+        </div>
+        <div class="nav-tabs" id="navTabs">${tabsHTML}</div>
+        <div class="content" id="moduleContent"></div>
+      `;
+      }
+
+      function renderModule(moduleKey) {
+        const cfg = getModuleConfig(moduleKey);
+        const fields = getFields(moduleKey);
+        const records = getStoreData(STORE_KEYS[moduleKey]);
+
+        const toolbarHTML = `
+        <div class="toolbar">
+          <button class="btn-fill" id="btnAdd">＋ 新增记录</button>
+          <button id="btnImport">📥 导入Excel</button>
+          <button id="btnExport">📤 导出Excel</button>
+          <input type="file" id="fileImport" accept=".xlsx,.xls" style="display:none;">
+        </div>
+      `;
+
+        let cardsHTML = '';
+        if (records.length === 0) {
+          cardsHTML = '<p style="color:#999;text-align:center;padding:40px;">暂无数据，点击"新增记录"开始</p>';
+        } else {
+          cardsHTML = records.map((rec, idx) => {
+            const fieldInputs = fields.map(f => {
+              const val = rec[f.name] !== undefined ? rec[f.name] : '';
+              if (f.type === 'select') {
+                const opts = (f.options || []).map(o =>
+                  `<option value="${o}" ${val==o?'selected':''}>${o}</option>`).join('');
+                return `
+                <div class="record-field">
+                  <label>${f.name}</label>
+                  <select data-field="${f.name}" data-idx="${idx}">${opts}</select>
+                </div>`;
+              } else if (f.readonly) {
+                return `
+                <div class="record-field">
+                  <label>${f.name}</label>
+                  <input type="${f.type==='date'?'date':'text'}" value="${val}" readonly>
+                </div>`;
+              } else {
+                return `
+                <div class="record-field">
+                  <label>${f.name}</label>
+                  <input type="${f.type==='date'?'date':f.type==='number'?'number':'text'}" value="${val}" data-field="${f.name}" data-idx="${idx}">
+                </div>`;
+              }
+            }).join('');
+
+            return `
+            <div class="record-card" data-idx="${idx}">
+              ${fieldInputs}
+              <div class="record-actions">
+                <button class="btn-del" data-idx="${idx}">✕ 删除</button>
+              </div>
+            </div>`;
+          }).join('');
+        }
+
+        return `
+        ${toolbarHTML}
+        <div class="records-list" id="recordsList">${cardsHTML}</div>
+      `;
+      }
+
+      // ==================== 事件绑定 ====================
+      function bindAuthEvents() {
+        const btnLogin = document.getElementById('btnLogin');
+        const btnRegister = document.getElementById('btnRegister');
+        const errorEl = document.getElementById('authError');
+
+        btnLogin?.addEventListener('click', () => {
+          const username = document.getElementById('authUser').value.trim();
+          const password = document.getElementById('authPass').value.trim();
+          const remember = document.getElementById('authRemember').checked;
+          errorEl.textContent = '';
+          try {
+            doLogin(username, password, remember);
+            refreshApp();
+          } catch (e) {
+            errorEl.textContent = e.message;
+          }
+        });
+
+        btnRegister?.addEventListener('click', () => {
+          const username = document.getElementById('authUser').value.trim();
+          const password = document.getElementById('authPass').value.trim();
+          errorEl.textContent = '';
+          try {
+            doRegister(username, password);
+            errorEl.textContent = '注册成功！请登录。';
+          } catch (e) {
+            errorEl.textContent = e.message;
+          }
+        });
+
+        // 回车登录
+        document.getElementById('authPass')?.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') btnLogin?.click();
+        });
+      }
+
+      function bindMainEvents() {
+        document.getElementById('btnLogout')?.addEventListener('click', () => {
+          clearSession();
+          refreshApp();
+        });
+
+        // 导航标签
+        document.querySelectorAll('.nav-tab').forEach(tab => {
+          tab.addEventListener('click', function() {
+            const mk = this.dataset.module;
+            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            refreshModuleContent(mk);
+          });
+        });
+
+        // 默认加载第一个模块
+        const firstTab = document.querySelector('.nav-tab');
+        if (firstTab) {
+          refreshModuleContent(firstTab.dataset.module);
+        }
+      }
+
+      function bindModuleEvents(moduleKey) {
+        const btnAdd = document.getElementById('btnAdd');
+        const btnImport = document.getElementById('btnImport');
+        const btnExport = document.getElementById('btnExport');
+        const fileInput = document.getElementById('fileImport');
+
+        btnAdd?.addEventListener('click', () => {
+          const records = getStoreData(STORE_KEYS[moduleKey]);
+          const cfg = getModuleConfig(moduleKey);
+          const fields = getFields(moduleKey);
+          const newRec = {};
+          fields.forEach(f => {
+            if (f.name === '单号') {
+              newRec[f.name] = generateCode(cfg.prefix, records);
+            } else {
+              newRec[f.name] = '';
+            }
+          });
+          records.push(newRec);
+          setStoreData(STORE_KEYS[moduleKey], records);
+          refreshModuleContent(moduleKey);
+        });
+
+        btnImport?.addEventListener('click', () => fileInput?.click());
+
+        fileInput?.addEventListener('change', function(e) {
+          const file = e.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = function(ev) {
+            try {
+              const data = new Uint8Array(ev.target.result);
+              const wb = XLSX.read(data, { type: 'array' });
+              const sheet = wb.Sheets[wb.SheetNames[0]];
+              const json = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+              if (json.length < 2) { alert('文件无数据'); return; }
+              const headers = json[0].map(h => String(h).trim());
+              const rows = json.slice(1).map(row => {
+                const obj = {};
+                headers.forEach((h, i) => { obj[h] = row[i] !== undefined ? row[i] : ''; });
+                return obj;
+              });
+              const existing = getStoreData(STORE_KEYS[moduleKey]);
+              setStoreData(STORE_KEYS[moduleKey], [...existing, ...rows]);
+              refreshModuleContent(moduleKey);
+            } catch (err) { alert('导入失败: ' + err.message); }
+          };
+          reader.readAsArrayBuffer(file);
+          e.target.value = '';
+        });
+
+        btnExport?.addEventListener('click', () => {
+          const records = getStoreData(STORE_KEYS[moduleKey]);
+          const fields = getFields(moduleKey);
+          const headers = fields.map(f => f.name);
+          const ws = XLSX.utils.json_to_sheet(records, { header: headers });
+          const wb = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+          const cfg = getModuleConfig(moduleKey);
+          XLSX.writeFile(wb, `${cfg.label}_${new Date().toISOString().slice(0,10)}.xlsx`);
+        });
+
+        // 字段编辑事件（事件委托）
+        const listEl = document.getElementById('recordsList');
+        listEl?.addEventListener('change', function(e) {
+          const target = e.target;
+          if (target.dataset.field && target.dataset.idx !== undefined) {
+            const fieldName = target.dataset.field;
+            const idx = parseInt(target.dataset.idx);
+            const records = getStoreData(STORE_KEYS[moduleKey]);
+            if (idx < records.length) {
+              records[idx][fieldName] = target.value;
+              // 自动计算金额
+              const fields = getFields(moduleKey);
+              if (fieldName === '数量' || fieldName === '单价') {
+                const qty = parseFloat(records[idx]['数量']) || 0;
+                const price = parseFloat(records[idx]['单价']) || 0;
+                records[idx]['金额'] = (qty * price).toFixed(2);
+              }
+              if (fieldName === '销售价格' || fieldName === '进货价') {
+                const sale = parseFloat(records[idx]['销售价格']) || 0;
+                const cost = parseFloat(records[idx]['进货价']) || 0;
+                records[idx]['利润'] = (sale - cost).toFixed(2);
+              }
+              setStoreData(STORE_KEYS[moduleKey], records);
+              // 局部刷新
+              refreshModuleContent(moduleKey);
+            }
+          }
+        });
+
+        listEl?.addEventListener('input', function(e) {
+          const target = e.target;
+          if (target.dataset.field && target.dataset.idx !== undefined && target.type === 'number') {
+            // 实时更新
+            target.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        });
+
+        // 删除按钮
+        listEl?.addEventListener('click', function(e) {
+          if (e.target.classList.contains('btn-del')) {
+            const idx = parseInt(e.target.dataset.idx);
+            if (confirm('确定删除此记录吗？')) {
+              const records = getStoreData(STORE_KEYS[moduleKey]);
+              records.splice(idx, 1);
+              setStoreData(STORE_KEYS[moduleKey], records);
+              refreshModuleContent(moduleKey);
+            }
+          }
+        });
+      }
+
+      // ==================== 刷新 ====================
+      function refreshModuleContent(moduleKey) {
+        const container = document.getElementById('moduleContent');
+        if (container) {
+          container.innerHTML = renderModule(moduleKey);
+          bindModuleEvents(moduleKey);
+        }
+      }
+
+      function refreshApp() {
+        const inner = document.getElementById('appInner');
+        const user = getSessionUser();
+        if (!user) {
+          inner.innerHTML = renderAuth();
+          bindAuthEvents();
+        } else {
+          inner.innerHTML = renderMain(user);
+          bindMainEvents();
+        }
+      }
+
+      // ==================== 初始化 ====================
+      function init() {
+        // 版本检查
+        const savedVer = localStorage.getItem(VERSION_KEY);
+        if (savedVer !== APP_VERSION) {
+          localStorage.setItem(VERSION_KEY, APP_VERSION);
+        }
+
+        // 确保用户数据存在
+        if (!localStorage.getItem(USERS_KEY)) {
+          localStorage.setItem(USERS_KEY, JSON.stringify(DEFAULT_USERS));
+        }
+
+        // 确保各模块数据存在
+        Object.values(STORE_KEYS).forEach(key => {
+          if (!localStorage.getItem(key)) {
+            localStorage.setItem(key, JSON.stringify([]));
+          }
+        });
+
+        // 3秒后显示
+        setTimeout(() => {
+          document.getElementById('appContainer').classList.add('show');
+          refreshApp();
+        }, 3000);
+      }
+
+      // 启动
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+      } else {
+        init();
+      }
+    })();
+  </script>
+</body>
+</html>
