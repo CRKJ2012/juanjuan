@@ -1188,6 +1188,7 @@
             <div class="content-header">
                 <div class="page-title">${title}</div>
                 <div class="header-actions">
+                    <button class="btn btn-default" onclick="importBaseExcel('${dataType}')">导入Excel</button>
                     <button class="btn btn-primary" onclick="openBaseAddForm('${dataType}')">+ 新增</button>
                 </div>
             </div>
@@ -1205,7 +1206,7 @@
                     </table>
                 </div>
             </div>
-            <input type="file" id="file-import" accept=".xls,.xlsx" style="display:none" onchange="handleFileImport('${dataType}')">
+            <input type="file" id="base-file-import" accept=".xls,.xlsx" style="display:none" onchange="handleBaseFileImport('${dataType}')">
             `;
 
             area.innerHTML = html;
@@ -1397,6 +1398,65 @@
             saveAppData().then(() => {
                 renderBaseTable(dataType);
             });
+        }
+
+        // ===== 基础信息导入 =====
+        function importBaseExcel(dataType) {
+            document.getElementById('base-file-import').click();
+        }
+
+        async function handleBaseFileImport(dataType) {
+            const fileInput = document.getElementById('base-file-import');
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                const json = XLSX.utils.sheet_to_json(sheet);
+
+                // 根据 dataType 映射列名
+                let colMap = {};
+                if (dataType === 'productInfo') {
+                    colMap = { '商品品牌': 'brand', '商品名称': 'goodsName', '商品型号': 'model', '规格参数': 'spec', '单位': 'unit',
+                        '备注': 'remark' };
+                } else if (dataType === 'employeeInfo') {
+                    colMap = { '姓名': 'name', '工号': 'empNo', '部门': 'dept', '职位': 'position', '电话': 'phone' };
+                } else if (dataType === 'supplierInfo') {
+                    colMap = { '供应商名称': 'name', '联系人': 'contact', '电话': 'phone', '地址': 'address', '备注': 'remark' };
+                }
+
+                let imported = 0;
+                json.forEach(row => {
+                    const mapped = {};
+                    Object.keys(row).forEach(k => {
+                        const key = colMap[k];
+                        if (key) mapped[key] = row[k];
+                    });
+                    // 检查必填
+                    let required = [];
+                    if (dataType === 'productInfo') required = ['brand', 'goodsName', 'model'];
+                    else if (dataType === 'employeeInfo') required = ['name'];
+                    else if (dataType === 'supplierInfo') required = ['name'];
+                    let valid = true;
+                    for (const r of required) {
+                        if (!mapped[r]) { valid = false; break; }
+                    }
+                    if (!valid) return;
+                    mapped.id = Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+                    if (!appData[dataType]) appData[dataType] = [];
+                    appData[dataType].push(mapped);
+                    imported++;
+                });
+
+                await saveAppData();
+                renderBaseTable(dataType);
+                alert(`成功导入 ${imported} 条记录`);
+                fileInput.value = '';
+            };
+            reader.readAsArrayBuffer(file);
         }
 
         // ===== 获取下拉选项 =====
@@ -1691,7 +1751,11 @@
                 <div class="form-item"><label>开票金额</label><input id="f_invoiceAmount" type="number" step="0.01"></div>
                 <div class="form-item"><label>开票日期</label><input id="f_invoiceDate" type="date"></div>
                 <div class="form-item"><label>归属仓库</label>
-                    <select id="f_warehouse"><option value="新库房">新库房</option><option value="老库房">老库房</option></select>
+                    <select id="f_warehouse">
+                        <option value="新库房">新库房</option>
+                        <option value="老库房">老库房</option>
+                        <option value="无">无</option>
+                    </select>
                 </div>
                 <div class="form-item full"><label>备注</label><textarea id="f_remark" rows="2"></textarea></div>
             </div>`;
@@ -2859,6 +2923,8 @@
         window.renderBaseTable = renderBaseTable;
         window.doLogin = doLogin;
         window.doRegister = doRegister;
+        window.importBaseExcel = importBaseExcel;
+        window.handleBaseFileImport = handleBaseFileImport;
     </script>
 </body>
 </html>
