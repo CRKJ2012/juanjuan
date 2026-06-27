@@ -1,946 +1,1726 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
-  <title>gorenje · 出入库管理系统</title>
-  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js">
-  </script>
-  <style>
-    :root {
-      --bg: #f5f6fa;
-      --card: #ffffff;
-      --text: #2d3436;
-      --text-light: #636e72;
-      --border: #e0e3e8;
-      --accent: #2d3436;
-      --accent-hover: #1a1e24;
-      --danger: #d63031;
-      --shadow: 0 2px 16px rgba(0, 0, 0, 0.06);
-      --radius: 12px;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>gorenje 出入库管理系统</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js">
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
 
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    body {
-      font-family: 'Inter', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-      background: var(--bg);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-      color: var(--text);
-    }
+        /* ========== 启动页 ========== */
+        #splash-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.8s ease;
+        }
+        .splash-logo {
+            font-size: 72px;
+            font-weight: 300;
+            color: #fff;
+            letter-spacing: 15px;
+            opacity: 0;
+            transform: translateY(30px);
+            animation: logoFadeIn 2s ease forwards;
+        }
+        .splash-line {
+            width: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #e94560, transparent);
+            margin-top: 20px;
+            animation: lineExpand 1.5s ease 0.8s forwards;
+        }
+        .splash-copyright {
+            position: absolute;
+            bottom: 30px;
+            color: #666;
+            font-size: 12px;
+            opacity: 0;
+            animation: fadeIn 1s ease 2s forwards;
+        }
+        @keyframes logoFadeIn {
+            0% {
+                opacity: 0;
+                transform: translateY(30px) scale(0.9);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        @keyframes lineExpand {
+            0% {
+                width: 0;
+            }
+            100% {
+                width: 300px;
+            }
+        }
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+            }
+        }
 
-    /* 启动画面 */
-    .splash {
-      position: fixed;
-      inset: 0;
-      background: #ffffff;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 9999;
-      animation: splashOut 0.5s ease 2.8s forwards;
-    }
-    .splash .logo {
-      font-size: clamp(3rem, 8vw, 5.5rem);
-      font-weight: 700;
-      letter-spacing: 10px;
-      color: #1a1a1a;
-      text-transform: lowercase;
-      animation: pulse 2.2s ease-in-out infinite;
-    }
-    .splash .copyright {
-      position: absolute;
-      bottom: 28px;
-      font-size: 12px;
-      color: #b0b8c0;
-      letter-spacing: 1px;
-    }
-    @keyframes pulse {
-      0%,
-      100% {
-        transform: scale(1);
-        opacity: 0.85;
-      }
-      50% {
-        transform: scale(1.04);
-        opacity: 1;
-      }
-    }
-    @keyframes splashOut {
-      0% {
-        opacity: 1;
-        visibility: visible;
-      }
-      99% {
-        opacity: 0;
-      }
-      100% {
-        opacity: 0;
-        visibility: hidden;
-      }
-    }
+        /* ========== 登录注册页 ========== */
+        #auth-screen {
+            display: none;
+            width: 100%;
+            height: 100vh;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            align-items: center;
+            justify-content: center;
+        }
+        .auth-box {
+            width: 400px;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 40px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .auth-title {
+            color: #fff;
+            font-size: 24px;
+            text-align: center;
+            margin-bottom: 30px;
+            letter-spacing: 3px;
+        }
+        .auth-tabs {
+            display: flex;
+            margin-bottom: 25px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .auth-tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            color: #888;
+            cursor: pointer;
+            transition: all 0.3s;
+            border-bottom: 2px solid transparent;
+        }
+        .auth-tab.active {
+            color: #e94560;
+            border-bottom-color: #e94560;
+        }
+        .form-group {
+            margin-bottom: 18px;
+        }
+        .form-group label {
+            display: block;
+            color: #aaa;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 12px 15px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            color: #fff;
+            font-size: 14px;
+            outline: none;
+            transition: border 0.3s;
+        }
+        .form-group input:focus {
+            border-color: #e94560;
+        }
+        .form-group input::placeholder {
+            color: #555;
+        }
+        .remember-box {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .remember-box input {
+            margin-right: 8px;
+        }
+        .remember-box label {
+            color: #aaa;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .auth-btn {
+            width: 100%;
+            padding: 12px;
+            background: #e94560;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-size: 15px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .auth-btn:hover {
+            background: #d63850;
+        }
+        .auth-tip {
+            color: #e94560;
+            font-size: 12px;
+            margin-top: 8px;
+            display: none;
+        }
 
-    /* 主应用 */
-    .app {
-      display: none;
-      width: 100%;
-      max-width: 1300px;
-      background: var(--card);
-      border-radius: 20px;
-      box-shadow: var(--shadow);
-      overflow: hidden;
-    }
-    .app.show {
-      display: block;
-    }
+        /* ========== 主系统 ========== */
+        #main-system {
+            display: none;
+            width: 100%;
+            height: 100vh;
+        }
+        .sidebar {
+            width: 220px;
+            height: 100%;
+            background: #1a1a2e;
+            float: left;
+            overflow-y: auto;
+            padding: 20px 0;
+        }
+        .sidebar-logo {
+            color: #fff;
+            font-size: 20px;
+            text-align: center;
+            letter-spacing: 5px;
+            padding: 10px 0 25px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 15px;
+        }
+        .menu-group {
+            margin-bottom: 5px;
+        }
+        .menu-title {
+            padding: 14px 20px;
+            color: #ccc;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 15px;
+            transition: all 0.2s;
+        }
+        .menu-title:hover {
+            background: rgba(233, 69, 96, 0.1);
+            color: #fff;
+        }
+        .menu-title.active {
+            background: rgba(233, 69, 96, 0.15);
+            color: #e94560;
+        }
+        .menu-arrow {
+            transition: transform 0.3s;
+            font-size: 12px;
+        }
+        .menu-title.expanded .menu-arrow {
+            transform: rotate(180deg);
+        }
+        .submenu {
+            display: none;
+            background: rgba(0, 0, 0, 0.2);
+        }
+        .submenu.open {
+            display: block;
+        }
+        .submenu-item {
+            padding: 12px 20px 12px 40px;
+            color: #999;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .submenu-item:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .submenu-item.active {
+            color: #e94560;
+            background: rgba(233, 69, 96, 0.1);
+            border-left: 3px solid #e94560;
+        }
 
-    /* 认证卡片 */
-    .auth-card {
-      max-width: 420px;
-      margin: 60px auto;
-      padding: 48px 36px;
-      text-align: center;
-      background: var(--card);
-      border-radius: 20px;
-      box-shadow: var(--shadow);
-    }
-    .auth-card h2 {
-      font-weight: 600;
-      font-size: 1.5rem;
-      margin-bottom: 28px;
-      color: var(--text);
-      letter-spacing: 2px;
-    }
-    .auth-card .field {
-      margin-bottom: 14px;
-      text-align: left;
-    }
-    .auth-card label {
-      display: block;
-      font-size: 13px;
-      color: var(--text-light);
-      margin-bottom: 5px;
-    }
-    .auth-card input {
-      width: 100%;
-      padding: 12px 16px;
-      border: 1.5px solid var(--border);
-      border-radius: 10px;
-      font-size: 14px;
-      outline: none;
-      transition: 0.2s;
-    }
-    .auth-card input:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(45, 52, 54, 0.08);
-    }
-    .auth-card .btn {
-      width: 100%;
-      padding: 13px;
-      border: none;
-      border-radius: 10px;
-      font-size: 15px;
-      font-weight: 600;
-      cursor: pointer;
-      margin-top: 10px;
-      transition: 0.2s;
-    }
-    .btn-primary {
-      background: var(--accent);
-      color: white;
-    }
-    .btn-primary:hover {
-      background: var(--accent-hover);
-    }
-    .btn-secondary {
-      background: #f1f2f6;
-      color: var(--text);
-    }
-    .btn-secondary:hover {
-      background: #e4e6eb;
-    }
-    .error-text {
-      color: var(--danger);
-      font-size: 13px;
-      margin-top: 8px;
-      min-height: 20px;
-    }
+        .main-content {
+            margin-left: 220px;
+            height: 100%;
+            background: #f5f6fa;
+            overflow-y: auto;
+        }
+        .content-header {
+            background: #fff;
+            padding: 18px 25px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .page-title {
+            font-size: 18px;
+            color: #333;
+            font-weight: 500;
+        }
+        .header-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: #e94560;
+            color: #fff;
+        }
+        .btn-primary:hover {
+            background: #d63850;
+        }
+        .btn-success {
+            background: #27ae60;
+            color: #fff;
+        }
+        .btn-success:hover {
+            background: #219a52;
+        }
+        .btn-default {
+            background: #fff;
+            color: #555;
+            border: 1px solid #ddd;
+        }
+        .btn-default:hover {
+            border-color: #e94560;
+            color: #e94560;
+        }
+        .btn-sm {
+            padding: 5px 12px;
+            font-size: 12px;
+        }
 
-    /* 主界面头部 */
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 18px 28px;
-      border-bottom: 1px solid var(--border);
-    }
-    .header .brand {
-      font-size: 1.2rem;
-      font-weight: 600;
-      letter-spacing: 2px;
-    }
-    .header .user-info {
-      font-size: 13px;
-      color: var(--text-light);
-    }
-    .header .logout-link {
-      color: var(--danger);
-      cursor: pointer;
-      margin-left: 12px;
-      text-decoration: none;
-    }
+        .content-body {
+            padding: 20px 25px;
+        }
+        .toolbar {
+            background: #fff;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .toolbar input,
+        .toolbar select {
+            padding: 7px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+            outline: none;
+        }
+        .toolbar input:focus,
+        .toolbar select:focus {
+            border-color: #e94560;
+        }
 
-    /* 导航标签 */
-    .nav-tabs {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 5px;
-      padding: 14px 24px;
-      border-bottom: 1px solid var(--border);
-      background: #fafbfc;
-    }
-    .nav-tab {
-      padding: 8px 16px;
-      border: 1px solid transparent;
-      background: transparent;
-      border-radius: 20px;
-      cursor: pointer;
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--text-light);
-      transition: 0.2s;
-      white-space: nowrap;
-    }
-    .nav-tab:hover {
-      background: #f0f1f5;
-    }
-    .nav-tab.active {
-      background: var(--accent);
-      color: white;
-      border-color: var(--accent);
-    }
+        .data-table {
+            width: 100%;
+            background: #fff;
+            border-radius: 6px;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .data-table th {
+            background: #f8f9fa;
+            padding: 12px 10px;
+            text-align: left;
+            font-weight: 500;
+            color: #555;
+            border-bottom: 1px solid #eee;
+            white-space: nowrap;
+        }
+        .data-table td {
+            padding: 10px;
+            border-bottom: 1px solid #f0f0f0;
+            color: #333;
+        }
+        .data-table tr:hover {
+            background: #fafafa;
+        }
+        .table-wrapper {
+            overflow-x: auto;
+        }
+        .empty-tip {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
 
-    /* 内容区 */
-    .content {
-      padding: 24px 28px;
-    }
-    .toolbar {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 20px;
-      flex-wrap: wrap;
-    }
-    .toolbar button {
-      padding: 9px 20px;
-      border: 1.5px solid var(--border);
-      background: white;
-      border-radius: 20px;
-      cursor: pointer;
-      font-size: 13px;
-      font-weight: 500;
-      transition: 0.2s;
-    }
-    .toolbar button:hover {
-      background: #f8f9fb;
-    }
-    .toolbar .btn-fill {
-      background: var(--accent);
-      color: white;
-      border-color: var(--accent);
-    }
-    .toolbar .btn-fill:hover {
-      background: var(--accent-hover);
-    }
+        /* 弹窗 */
+        .modal-mask {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal-mask.show {
+            display: flex;
+        }
+        .modal {
+            background: #fff;
+            border-radius: 8px;
+            width: 900px;
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+        .modal-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            background: #fff;
+            z-index: 2;
+        }
+        .modal-title {
+            font-size: 16px;
+            font-weight: 500;
+        }
+        .modal-close {
+            cursor: pointer;
+            color: #999;
+            font-size: 20px;
+        }
+        .modal-body {
+            padding: 20px;
+        }
+        .modal-footer {
+            padding: 15px 20px;
+            border-top: 1px solid #eee;
+            text-align: right;
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            position: sticky;
+            bottom: 0;
+            background: #fff;
+            z-index: 2;
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+        .form-grid .form-item {
+            display: flex;
+            flex-direction: column;
+        }
+        .form-item label {
+            font-size: 13px;
+            color: #555;
+            margin-bottom: 5px;
+        }
+        .form-item input,
+        .form-item select,
+        .form-item textarea {
+            padding: 8px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+            outline: none;
+        }
+        .form-item input:focus,
+        .form-item select:focus,
+        .form-item textarea:focus {
+            border-color: #e94560;
+        }
+        .form-item.full {
+            grid-column: span 3;
+        }
 
-    /* 记录卡片列表（列显示） */
-    .records-list {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .record-card {
-      background: #fafbfd;
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 18px 20px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px 20px;
-      align-items: flex-start;
-      transition: 0.2s;
-    }
-    .record-card:hover {
-      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
-    }
-    .record-field {
-      display: flex;
-      flex-direction: column;
-      min-width: 110px;
-      flex: 1 1 140px;
-      max-width: 200px;
-    }
-    .record-field label {
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--text-light);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 4px;
-      white-space: nowrap;
-    }
-    .record-field input,
-    .record-field select {
-      width: 100%;
-      padding: 8px 10px;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      font-size: 13px;
-      background: white;
-      outline: none;
-      transition: 0.2s;
-    }
-    .record-field input:focus,
-    .record-field select:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 2px rgba(45, 52, 54, 0.06);
-    }
-    .record-field input[readonly] {
-      background: #f5f5f5;
-      color: #888;
-    }
-    .record-actions {
-      display: flex;
-      align-items: flex-end;
-      gap: 6px;
-      padding-bottom: 2px;
-      flex-shrink: 0;
-    }
-    .record-actions button {
-      padding: 8px 12px;
-      border: 1px solid var(--border);
-      background: white;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 12px;
-      transition: 0.2s;
-    }
-    .record-actions .btn-del {
-      color: var(--danger);
-      border-color: #fdd;
-    }
-    .record-actions .btn-del:hover {
-      background: #fff5f5;
-    }
+        .sub-fieldset {
+            border: 1px dashed #ddd;
+            border-radius: 4px;
+            padding: 10px 15px;
+            margin-top: 5px;
+        }
+        .sub-fieldset legend {
+            font-size: 12px;
+            color: #888;
+            padding: 0 5px;
+        }
 
-    /* 响应式 */
-    @media (max-width: 768px) {
-      .record-field {
-        min-width: 90px;
-        flex: 1 1 100px;
-        max-width: 150px;
-      }
-    }
+        .action-btn {
+            padding: 4px 8px;
+            font-size: 12px;
+            margin-right: 5px;
+            border: 1px solid #ddd;
+            background: #fff;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .action-btn.edit {
+            color: #e94560;
+            border-color: #e94560;
+        }
+        .action-btn.delete {
+            color: #e74c3c;
+            border-color: #e74c3c;
+        }
 
-    .footer-text {
-      text-align: right;
-      padding: 10px 28px;
-      font-size: 11px;
-      color: #b0b8c0;
-      border-top: 1px solid var(--border);
-    }
-  </style>
+        /* 导出配置弹窗样式 */
+        .export-field-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px 15px;
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 5px 0;
+        }
+        .export-field-grid label {
+            display: flex;
+            align-items: center;
+            font-size: 13px;
+            color: #444;
+            cursor: pointer;
+            padding: 3px 0;
+        }
+        .export-field-grid label input[type="checkbox"] {
+            margin-right: 6px;
+            accent-color: #e94560;
+        }
+        .export-options {
+            margin: 15px 0 10px;
+            padding: 12px 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 20px;
+        }
+        .export-options label {
+            display: flex;
+            align-items: center;
+            font-size: 13px;
+            color: #444;
+            cursor: pointer;
+        }
+        .export-options label input[type="checkbox"] {
+            margin-right: 6px;
+            accent-color: #e94560;
+        }
+        .select-all-link {
+            color: #e94560;
+            cursor: pointer;
+            font-size: 13px;
+            margin-left: 10px;
+            text-decoration: underline;
+        }
+        .select-all-link:hover {
+            color: #c0392b;
+        }
+        .field-count {
+            font-size: 12px;
+            color: #999;
+            margin-left: 8px;
+        }
+
+        /* 滚动条 */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #ccc;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 60px;
+            }
+            .sidebar-logo {
+                font-size: 14px;
+                letter-spacing: 2px;
+            }
+            .menu-title {
+                font-size: 12px;
+                padding: 10px 12px;
+            }
+            .submenu-item {
+                font-size: 12px;
+                padding: 10px 12px 10px 20px;
+            }
+            .main-content {
+                margin-left: 60px;
+            }
+            .export-field-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+            .form-item.full {
+                grid-column: 1;
+            }
+            .modal {
+                width: 95%;
+            }
+        }
+    </style>
 </head>
 <body>
 
-  <!-- 启动动画 -->
-  <div class="splash" id="splashScreen">
-    <div class="logo">gorenje</div>
-    <div class="copyright">灿然科技@2026 版权所有</div>
-  </div>
+    <!-- 启动页 -->
+    <div id="splash-screen">
+        <div class="splash-logo">gorenje</div>
+        <div class="splash-line"></div>
+        <div class="splash-copyright">灿然科技@2026 版权所有</div>
+    </div>
 
-  <!-- 主应用容器 -->
-  <div class="app" id="appContainer">
-    <div id="appInner"></div>
-    <div class="footer-text">灿然科技@2026 版权所有</div>
-  </div>
+    <!-- 登录注册页 -->
+    <div id="auth-screen">
+        <div class="auth-box">
+            <div class="auth-title">出入库管理系统</div>
+            <div class="auth-tabs">
+                <div class="auth-tab active" data-tab="login">登录</div>
+                <div class="auth-tab" data-tab="register">注册</div>
+            </div>
 
-  <script>
-    (function() {
-      // ==================== 配置 ====================
-      const APP_VERSION = '3.0';
-      const SESSION_USER_KEY = 'gorenje_session_user';
-      const SESSION_REMEMBER_KEY = 'gorenje_session_remember';
-      const USERS_KEY = 'gorenje_users_db';
-      const VERSION_KEY = 'gorenje_data_version';
+            <div id="login-form">
+                <div class="form-group">
+                    <label>账号（全英文）</label>
+                    <input type="text" id="login-username" placeholder="请输入账号">
+                </div>
+                <div class="form-group">
+                    <label>密码（数字+小写字母）</label>
+                    <input type="password" id="login-password" placeholder="请输入密码">
+                </div>
+                <div class="remember-box">
+                    <input type="checkbox" id="remember-me">
+                    <label for="remember-me">记住密码</label>
+                </div>
+                <div class="auth-tip" id="login-tip"></div>
+                <button class="auth-btn" onclick="doLogin()">登 录</button>
+            </div>
 
-      // 默认用户
-      const DEFAULT_USERS = [{ username: 'admin', password: 'admin123' }];
+            <div id="register-form" style="display:none;">
+                <div class="form-group">
+                    <label>账号（全英文）</label>
+                    <input type="text" id="reg-username" placeholder="只能输入英文字母">
+                </div>
+                <div class="form-group">
+                    <label>密码（数字+小写字母）</label>
+                    <input type="password" id="reg-password" placeholder="至少6位，数字+小写字母组合">
+                </div>
+                <div class="form-group">
+                    <label>确认密码</label>
+                    <input type="password" id="reg-password2" placeholder="再次输入密码">
+                </div>
+                <div class="auth-tip" id="reg-tip"></div>
+                <button class="auth-btn" onclick="doRegister()">注 册</button>
+            </div>
+        </div>
+    </div>
 
-      // 各模块存储键
-      const STORE_KEYS = {
-        purchase: 'gorenje_purchase_in',
-        purchaseExchange: 'gorenje_purchase_ex',
-        purchaseReturn: 'gorenje_purchase_ret',
-        retailOrder: 'gorenje_retail_order',
-        retailBill: 'gorenje_retail_bill',
-        retailExchange: 'gorenje_retail_ex',
-        retailReturn: 'gorenje_retail_ret',
-        inventory: 'gorenje_inventory',
-        sampleRegister: 'gorenje_sample_reg',
-        sampleSale: 'gorenje_sample_sale'
-      };
+    <!-- 主系统 -->
+    <div id="main-system">
+        <!-- 侧边栏 -->
+        <div class="sidebar">
+            <div class="sidebar-logo">gorenje</div>
 
-      // ==================== 字段定义（带下拉选项） ====================
-      function getFields(moduleKey) {
-        const commonBool = ['是', '否'];
-        const warehouse = ['新库房', '老库房'];
-        const channels = ['佳洛顺驰', '洛高', '商场', '个人'];
-        const posBelong = ['佳洛顺驰', '洛高'];
+            <div class="menu-group">
+                <div class="menu-title" onclick="toggleMenu(this)">
+                    <span>一、入库管理</span>
+                    <span class="menu-arrow">▼</span>
+                </div>
+                <div class="submenu">
+                    <div class="submenu-item" onclick="showPage('purchase-in')">1、采购入库</div>
+                    <div class="submenu-item" onclick="showPage('purchase-exchange')">2、采购换货</div>
+                    <div class="submenu-item" onclick="showPage('purchase-return')">3、采购退货</div>
+                </div>
+            </div>
 
-        const purchaseBase = [
-          { name: '单号', type: 'text', readonly: true },
-          { name: '供应商', type: 'text' },
-          { name: '采购日期', type: 'date' },
-          { name: '收货日期', type: 'date' },
-          { name: '商品品牌', type: 'text' },
-          { name: '商品名称', type: 'text' },
-          { name: '商品型号', type: 'text' },
-          { name: '数量', type: 'number' },
-          { name: '单价', type: 'number' },
-          { name: '金额', type: 'number', readonly: true, computed: true },
-          { name: '是否已开票', type: 'select', options: commonBool },
-          { name: '开票金额', type: 'number' },
-          { name: '开票日期', type: 'date' },
-          { name: '归属仓库', type: 'select', options: warehouse },
-          { name: '备注', type: 'text' }
-        ];
+            <div class="menu-group">
+                <div class="menu-title" onclick="toggleMenu(this)">
+                    <span>二、零售管理</span>
+                    <span class="menu-arrow">▼</span>
+                </div>
+                <div class="submenu">
+                    <div class="submenu-item" onclick="showPage('retail-order')">1、零售订单</div>
+                    <div class="submenu-item" onclick="showPage('retail-sell')">2、零售开单</div>
+                    <div class="submenu-item" onclick="showPage('retail-exchange')">3、零售换货</div>
+                    <div class="submenu-item" onclick="showPage('retail-return')">4、零售退货</div>
+                </div>
+            </div>
 
-        const retailBase = [
-          { name: '单号', type: 'text', readonly: true },
-          { name: '订单来源', type: 'select', options: channels },
-          { name: '订单日期', type: 'date' },
-          { name: '客户姓名', type: 'text' },
-          { name: '联系电话', type: 'text' },
-          { name: '销售人员', type: 'text' },
-          { name: '销售渠道', type: 'select', options: channels },
-          { name: '商品名称', type: 'text' },
-          { name: '商品规格型号', type: 'text' },
-          { name: '销售价格', type: 'number' },
-          { name: '零售价格', type: 'number' },
-          { name: '折扣', type: 'text' },
-          { name: '收款方式', type: 'select', options: channels },
-          { name: '收款金额', type: 'number' },
-          { name: '是否有尾款', type: 'text' },
-          { name: '是否国补', type: 'select', options: commonBool },
-          { name: 'POS机归属', type: 'select', options: posBelong },
-          { name: 'POS机交易金额', type: 'number' },
-          { name: '补贴金额', type: 'number' },
-          { name: 'POS机交易日期', type: 'date' },
-          { name: '安装地址', type: 'text' },
-          { name: '是否安装', type: 'select', options: commonBool },
-          { name: '安装日期', type: 'date' },
-          { name: '安装是否录系统', type: 'select', options: commonBool },
-          { name: '是否录销量', type: 'select', options: commonBool },
-          { name: '录销量日期', type: 'date' },
-          { name: '是否开发票', type: 'select', options: commonBool },
-          { name: '开票日期', type: 'date' },
-          { name: '进货价', type: 'number' },
-          { name: '利润', type: 'number', readonly: true, computed: true },
-          { name: '备注', type: 'text' }
-        ];
+            <div class="menu-group">
+                <div class="menu-title" onclick="toggleMenu(this)">
+                    <span>三、库存管理</span>
+                    <span class="menu-arrow">▼</span>
+                </div>
+                <div class="submenu">
+                    <div class="submenu-item" onclick="showPage('stock-daily')">库存日报</div>
+                </div>
+            </div>
 
-        const inventoryBase = [
-          { name: '商品品牌', type: 'text' },
-          { name: '商品名称', type: 'text' },
-          { name: '商品型号', type: 'text' },
-          { name: '账面库存', type: 'number' },
-          { name: '销售订货', type: 'number' },
-          { name: '可用库存', type: 'number' },
-          { name: '归属仓库', type: 'select', options: warehouse }
-        ];
+            <div class="menu-group">
+                <div class="menu-title" onclick="toggleMenu(this)">
+                    <span>四、样机管理</span>
+                    <span class="menu-arrow">▼</span>
+                </div>
+                <div class="submenu">
+                    <div class="submenu-item" onclick="showPage('sample-display')">1、门店上样</div>
+                    <div class="submenu-item" onclick="showPage('sample-sell')">2、样机销售</div>
+                </div>
+            </div>
+        </div>
 
-        const sampleRegBase = [
-          { name: '单号', type: 'text', readonly: true },
-          { name: '上样门店地址', type: 'text' },
-          { name: '上样日期', type: 'date' },
-          { name: '商品品牌', type: 'text' },
-          { name: '商品名称', type: 'text' },
-          { name: '商品型号', type: 'text' },
-          { name: '数量', type: 'number' },
-          { name: '价格', type: 'number' },
-          { name: '金额', type: 'number', readonly: true, computed: true },
-          { name: '负责人', type: 'text' }
-        ];
+        <!-- 主内容区 -->
+        <div class="main-content" id="content-area">
+            <!-- 动态内容渲染区 -->
+        </div>
+    </div>
 
-        const fieldMap = {
-          purchase: purchaseBase,
-          purchaseExchange: purchaseBase,
-          purchaseReturn: purchaseBase,
-          retailOrder: retailBase,
-          retailBill: retailBase,
-          retailExchange: retailBase,
-          retailReturn: retailBase,
-          inventory: inventoryBase,
-          sampleRegister: sampleRegBase,
-          sampleSale: retailBase
+    <!-- 通用弹窗 -->
+    <div class="modal-mask" id="modal-mask">
+        <div class="modal" id="modal-box">
+            <div class="modal-header">
+                <span class="modal-title" id="modal-title">标题</span>
+                <span class="modal-close" onclick="closeModal()">×</span>
+            </div>
+            <div class="modal-body" id="modal-body"></div>
+            <div class="modal-footer" id="modal-footer"></div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== 数据存储 ====================
+        const STORAGE_KEY = 'gorenje_inventory_data';
+
+        function loadData() {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (raw) return JSON.parse(raw);
+            return {
+                users: {},
+                currentUser: null,
+                purchaseIn: [],
+                purchaseExchange: [],
+                purchaseReturn: [],
+                retailOrder: [],
+                retailSell: [],
+                retailExchange: [],
+                retailReturn: [],
+                sampleDisplay: [],
+                sampleSell: [],
+                stock: []
+            };
+        }
+
+        function saveData(data) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        }
+
+        let appData = loadData();
+
+        // ==================== 启动动画 ====================
+        window.onload = function() {
+            setTimeout(() => {
+                document.getElementById('splash-screen').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('splash-screen').style.display = 'none';
+                    document.getElementById('auth-screen').style.display = 'flex';
+                    checkRememberedLogin();
+                }, 800);
+            }, 3000);
         };
 
-        return fieldMap[moduleKey] || purchaseBase;
-      }
+        // ==================== 登录注册 ====================
+        document.querySelectorAll('.auth-tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+                if (this.dataset.tab === 'login') {
+                    document.getElementById('login-form').style.display = 'block';
+                    document.getElementById('register-form').style.display = 'none';
+                } else {
+                    document.getElementById('login-form').style.display = 'none';
+                    document.getElementById('register-form').style.display = 'block';
+                }
+            });
+        });
 
-      // 模块配置
-      function getModuleConfig(moduleKey) {
-        const configs = {
-          purchase: { label: '采购入库', prefix: 'CG' },
-          purchaseExchange: { label: '采购换货', prefix: 'CH' },
-          purchaseReturn: { label: '采购退货', prefix: 'CT' },
-          retailOrder: { label: '零售订单', prefix: 'DD' },
-          retailBill: { label: '零售开单', prefix: 'KD' },
-          retailExchange: { label: '零售换货', prefix: 'HH' },
-          retailReturn: { label: '零售退货', prefix: 'TH' },
-          inventory: { label: '库存日报', prefix: 'KC' },
-          sampleRegister: { label: '门店上样', prefix: 'SY' },
-          sampleSale: { label: '样机销售', prefix: 'XS' }
-        };
-        return configs[moduleKey] || { label: moduleKey, prefix: 'XX' };
-      }
-
-      // ==================== 数据操作 ====================
-      function getStoreData(key) {
-        try {
-          const raw = localStorage.getItem(key);
-          return raw ? JSON.parse(raw) : [];
-        } catch (e) {
-          return [];
-        }
-      }
-
-      function setStoreData(key, data) {
-        localStorage.setItem(key, JSON.stringify(data));
-      }
-
-      function getUsers() {
-        return getStoreData(USERS_KEY).length > 0 ? getStoreData(USERS_KEY) : DEFAULT_USERS;
-      }
-
-      function saveUsers(users) {
-        setStoreData(USERS_KEY, users);
-      }
-
-      function getSessionUser() {
-        const raw = sessionStorage.getItem(SESSION_USER_KEY);
-        return raw ? JSON.parse(raw) : null;
-      }
-
-      function setSessionUser(user) {
-        sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(user));
-      }
-
-      function clearSession() {
-        sessionStorage.removeItem(SESSION_USER_KEY);
-        sessionStorage.removeItem(SESSION_REMEMBER_KEY);
-      }
-
-      function getRemembered() {
-        const raw = sessionStorage.getItem(SESSION_REMEMBER_KEY);
-        return raw ? JSON.parse(raw) : null;
-      }
-
-      function setRemembered(creds) {
-        sessionStorage.setItem(SESSION_REMEMBER_KEY, JSON.stringify(creds));
-      }
-
-      // ==================== 单号生成 ====================
-      function generateCode(prefix, records) {
-        const maxNum = records.reduce((max, r) => {
-          if (r['单号'] && typeof r['单号'] === 'string' && r['单号'].startsWith(prefix)) {
-            const num = parseInt(r['单号'].substring(prefix.length));
-            return isNaN(num) ? max : Math.max(max, num);
-          }
-          return max;
-        }, 0);
-        return prefix + String(maxNum + 1).padStart(4, '0');
-      }
-
-      // ==================== 认证逻辑 ====================
-      function validateUsername(u) { return /^[a-zA-Z]+$/.test(u); }
-
-      function validatePassword(p) { return /^(?=.*[0-9])(?=.*[a-z])[a-z0-9]+$/.test(p); }
-
-      function doLogin(username, password, remember) {
-        if (!validateUsername(username)) throw new Error('账号必须是全英文！');
-        if (!validatePassword(password)) throw new Error('密码必须包含数字和小写字母！');
-        const users = getUsers();
-        const user = users.find(u => u.username === username && u.password === password);
-        if (!user) throw new Error('账号或密码错误！');
-        setSessionUser(user);
-        if (remember) {
-          setRemembered({ username, password });
-        } else {
-          sessionStorage.removeItem(SESSION_REMEMBER_KEY);
-        }
-        return user;
-      }
-
-      function doRegister(username, password) {
-        if (!validateUsername(username)) throw new Error('账号必须是全英文！');
-        if (!validatePassword(password)) throw new Error('密码必须包含数字和小写字母！');
-        const users = getUsers();
-        if (users.find(u => u.username === username)) throw new Error('账号已存在！');
-        users.push({ username, password });
-        saveUsers(users);
-      }
-
-      // ==================== 渲染 ====================
-      function renderAuth() {
-        const remembered = getRemembered();
-        const remUser = remembered ? remembered.username : '';
-        const remPass = remembered ? remembered.password : '';
-        const remChecked = remembered ? 'checked' : '';
-
-        return `
-        <div class="auth-card">
-          <h2>gorenje 管理登录</h2>
-          <div class="field">
-            <label>账号</label>
-            <input type="text" id="authUser" placeholder="全英文账号" value="${remUser}" autocomplete="off">
-          </div>
-          <div class="field">
-            <label>密码</label>
-            <input type="password" id="authPass" placeholder="数字+小写字母" value="${remPass}" autocomplete="off">
-          </div>
-          <div class="field" style="display:flex;align-items:center;gap:8px;">
-            <input type="checkbox" id="authRemember" ${remChecked} style="width:auto;">
-            <label style="margin:0;font-size:13px;">记住密码（重启电脑后清除）</label>
-          </div>
-          <button class="btn btn-primary" id="btnLogin">登 录</button>
-          <button class="btn btn-secondary" id="btnRegister">注册新账号</button>
-          <div class="error-text" id="authError"></div>
-        </div>
-      `;
-      }
-
-      function renderMain(user) {
-        const modules = [
-          'purchase', 'purchaseExchange', 'purchaseReturn',
-          'retailOrder', 'retailBill', 'retailExchange', 'retailReturn',
-          'inventory', 'sampleRegister', 'sampleSale'
-        ];
-
-        const tabsHTML = modules.map((mk, i) => {
-          const cfg = getModuleConfig(mk);
-          return `<button class="nav-tab ${i===0?'active':''}" data-module="${mk}">${cfg.label}</button>`;
-        }).join('');
-
-        return `
-        <div class="header">
-          <span class="brand">gorenje 出入库管理</span>
-          <span class="user-info">
-            👤 ${user.username}
-            <span class="logout-link" id="btnLogout">退出登录</span>
-          </span>
-        </div>
-        <div class="nav-tabs" id="navTabs">${tabsHTML}</div>
-        <div class="content" id="moduleContent"></div>
-      `;
-      }
-
-      function renderModule(moduleKey) {
-        const cfg = getModuleConfig(moduleKey);
-        const fields = getFields(moduleKey);
-        const records = getStoreData(STORE_KEYS[moduleKey]);
-
-        const toolbarHTML = `
-        <div class="toolbar">
-          <button class="btn-fill" id="btnAdd">＋ 新增记录</button>
-          <button id="btnImport">📥 导入Excel</button>
-          <button id="btnExport">📤 导出Excel</button>
-          <input type="file" id="fileImport" accept=".xlsx,.xls" style="display:none;">
-        </div>
-      `;
-
-        let cardsHTML = '';
-        if (records.length === 0) {
-          cardsHTML = '<p style="color:#999;text-align:center;padding:40px;">暂无数据，点击"新增记录"开始</p>';
-        } else {
-          cardsHTML = records.map((rec, idx) => {
-            const fieldInputs = fields.map(f => {
-              const val = rec[f.name] !== undefined ? rec[f.name] : '';
-              if (f.type === 'select') {
-                const opts = (f.options || []).map(o =>
-                  `<option value="${o}" ${val==o?'selected':''}>${o}</option>`).join('');
-                return `
-                <div class="record-field">
-                  <label>${f.name}</label>
-                  <select data-field="${f.name}" data-idx="${idx}">${opts}</select>
-                </div>`;
-              } else if (f.readonly) {
-                return `
-                <div class="record-field">
-                  <label>${f.name}</label>
-                  <input type="${f.type==='date'?'date':'text'}" value="${val}" readonly>
-                </div>`;
-              } else {
-                return `
-                <div class="record-field">
-                  <label>${f.name}</label>
-                  <input type="${f.type==='date'?'date':f.type==='number'?'number':'text'}" value="${val}" data-field="${f.name}" data-idx="${idx}">
-                </div>`;
-              }
-            }).join('');
-
-            return `
-            <div class="record-card" data-idx="${idx}">
-              ${fieldInputs}
-              <div class="record-actions">
-                <button class="btn-del" data-idx="${idx}">✕ 删除</button>
-              </div>
-            </div>`;
-          }).join('');
+        function validateUsername(name) {
+            return /^[a-zA-Z]+$/.test(name);
         }
 
-        return `
-        ${toolbarHTML}
-        <div class="records-list" id="recordsList">${cardsHTML}</div>
-      `;
-      }
-
-      // ==================== 事件绑定 ====================
-      function bindAuthEvents() {
-        const btnLogin = document.getElementById('btnLogin');
-        const btnRegister = document.getElementById('btnRegister');
-        const errorEl = document.getElementById('authError');
-
-        btnLogin?.addEventListener('click', () => {
-          const username = document.getElementById('authUser').value.trim();
-          const password = document.getElementById('authPass').value.trim();
-          const remember = document.getElementById('authRemember').checked;
-          errorEl.textContent = '';
-          try {
-            doLogin(username, password, remember);
-            refreshApp();
-          } catch (e) {
-            errorEl.textContent = e.message;
-          }
-        });
-
-        btnRegister?.addEventListener('click', () => {
-          const username = document.getElementById('authUser').value.trim();
-          const password = document.getElementById('authPass').value.trim();
-          errorEl.textContent = '';
-          try {
-            doRegister(username, password);
-            errorEl.textContent = '注册成功！请登录。';
-          } catch (e) {
-            errorEl.textContent = e.message;
-          }
-        });
-
-        // 回车登录
-        document.getElementById('authPass')?.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter') btnLogin?.click();
-        });
-      }
-
-      function bindMainEvents() {
-        document.getElementById('btnLogout')?.addEventListener('click', () => {
-          clearSession();
-          refreshApp();
-        });
-
-        // 导航标签
-        document.querySelectorAll('.nav-tab').forEach(tab => {
-          tab.addEventListener('click', function() {
-            const mk = this.dataset.module;
-            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-            this.classList.add('active');
-            refreshModuleContent(mk);
-          });
-        });
-
-        // 默认加载第一个模块
-        const firstTab = document.querySelector('.nav-tab');
-        if (firstTab) {
-          refreshModuleContent(firstTab.dataset.module);
+        function validatePassword(pwd) {
+            return /^(?=.*[a-z])(?=.*\d)[a-z\d]{6,}$/.test(pwd);
         }
-      }
 
-      function bindModuleEvents(moduleKey) {
-        const btnAdd = document.getElementById('btnAdd');
-        const btnImport = document.getElementById('btnImport');
-        const btnExport = document.getElementById('btnExport');
-        const fileInput = document.getElementById('fileImport');
+        function doRegister() {
+            const name = document.getElementById('reg-username').value.trim();
+            const pwd = document.getElementById('reg-password').value;
+            const pwd2 = document.getElementById('reg-password2').value;
+            const tip = document.getElementById('reg-tip');
 
-        btnAdd?.addEventListener('click', () => {
-          const records = getStoreData(STORE_KEYS[moduleKey]);
-          const cfg = getModuleConfig(moduleKey);
-          const fields = getFields(moduleKey);
-          const newRec = {};
-          fields.forEach(f => {
-            if (f.name === '单号') {
-              newRec[f.name] = generateCode(cfg.prefix, records);
+            if (!name) { tip.textContent = '请输入账号';
+                tip.style.display = 'block'; return; }
+            if (!validateUsername(name)) { tip.textContent = '账号必须为全英文字母';
+                tip.style.display = 'block'; return; }
+            if (!validatePassword(pwd)) { tip.textContent = '密码需6位以上，数字+小写字母组合';
+                tip.style.display = 'block'; return; }
+            if (pwd !== pwd2) { tip.textContent = '两次密码不一致';
+                tip.style.display = 'block'; return; }
+            if (appData.users[name]) { tip.textContent = '账号已存在';
+                tip.style.display = 'block'; return; }
+
+            appData.users[name] = { password: pwd };
+            saveData(appData);
+            tip.style.color = '#27ae60';
+            tip.textContent = '注册成功，请登录';
+            tip.style.display = 'block';
+            setTimeout(() => {
+                document.querySelector('[data-tab="login"]').click();
+                document.getElementById('login-username').value = name;
+            }, 1000);
+        }
+
+        function doLogin() {
+            const name = document.getElementById('login-username').value.trim();
+            const pwd = document.getElementById('login-password').value;
+            const remember = document.getElementById('remember-me').checked;
+            const tip = document.getElementById('login-tip');
+
+            if (!name || !pwd) { tip.textContent = '请输入账号和密码';
+                tip.style.display = 'block'; return; }
+
+            const user = appData.users[name];
+            if (!user || user.password !== pwd) {
+                tip.textContent = '账号或密码错误';
+                tip.style.display = 'block';
+                return;
+            }
+
+            appData.currentUser = name;
+            saveData(appData);
+
+            if (remember) {
+                sessionStorage.setItem('gorenje_remember', '1');
+                localStorage.setItem('gorenje_last_user', name);
             } else {
-              newRec[f.name] = '';
+                sessionStorage.setItem('gorenje_remember', '0');
             }
-          });
-          records.push(newRec);
-          setStoreData(STORE_KEYS[moduleKey], records);
-          refreshModuleContent(moduleKey);
-        });
 
-        btnImport?.addEventListener('click', () => fileInput?.click());
+            enterSystem();
+        }
 
-        fileInput?.addEventListener('change', function(e) {
-          const file = e.target.files[0];
-          if (!file) return;
-          const reader = new FileReader();
-          reader.onload = function(ev) {
-            try {
-              const data = new Uint8Array(ev.target.result);
-              const wb = XLSX.read(data, { type: 'array' });
-              const sheet = wb.Sheets[wb.SheetNames[0]];
-              const json = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-              if (json.length < 2) { alert('文件无数据'); return; }
-              const headers = json[0].map(h => String(h).trim());
-              const rows = json.slice(1).map(row => {
-                const obj = {};
-                headers.forEach((h, i) => { obj[h] = row[i] !== undefined ? row[i] : ''; });
-                return obj;
-              });
-              const existing = getStoreData(STORE_KEYS[moduleKey]);
-              setStoreData(STORE_KEYS[moduleKey], [...existing, ...rows]);
-              refreshModuleContent(moduleKey);
-            } catch (err) { alert('导入失败: ' + err.message); }
-          };
-          reader.readAsArrayBuffer(file);
-          e.target.value = '';
-        });
-
-        btnExport?.addEventListener('click', () => {
-          const records = getStoreData(STORE_KEYS[moduleKey]);
-          const fields = getFields(moduleKey);
-          const headers = fields.map(f => f.name);
-          const ws = XLSX.utils.json_to_sheet(records, { header: headers });
-          const wb = XLSX.utils.book_new();
-          XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
-          const cfg = getModuleConfig(moduleKey);
-          XLSX.writeFile(wb, `${cfg.label}_${new Date().toISOString().slice(0,10)}.xlsx`);
-        });
-
-        // 字段编辑事件（事件委托）
-        const listEl = document.getElementById('recordsList');
-        listEl?.addEventListener('change', function(e) {
-          const target = e.target;
-          if (target.dataset.field && target.dataset.idx !== undefined) {
-            const fieldName = target.dataset.field;
-            const idx = parseInt(target.dataset.idx);
-            const records = getStoreData(STORE_KEYS[moduleKey]);
-            if (idx < records.length) {
-              records[idx][fieldName] = target.value;
-              // 自动计算金额
-              const fields = getFields(moduleKey);
-              if (fieldName === '数量' || fieldName === '单价') {
-                const qty = parseFloat(records[idx]['数量']) || 0;
-                const price = parseFloat(records[idx]['单价']) || 0;
-                records[idx]['金额'] = (qty * price).toFixed(2);
-              }
-              if (fieldName === '销售价格' || fieldName === '进货价') {
-                const sale = parseFloat(records[idx]['销售价格']) || 0;
-                const cost = parseFloat(records[idx]['进货价']) || 0;
-                records[idx]['利润'] = (sale - cost).toFixed(2);
-              }
-              setStoreData(STORE_KEYS[moduleKey], records);
-              // 局部刷新
-              refreshModuleContent(moduleKey);
+        function checkRememberedLogin() {
+            const remembered = sessionStorage.getItem('gorenje_remember');
+            const lastUser = localStorage.getItem('gorenje_last_user');
+            if (remembered === '1' && lastUser && appData.users[lastUser]) {
+                appData.currentUser = lastUser;
+                enterSystem();
+            } else if (lastUser) {
+                document.getElementById('login-username').value = lastUser;
             }
-          }
-        });
+        }
 
-        listEl?.addEventListener('input', function(e) {
-          const target = e.target;
-          if (target.dataset.field && target.dataset.idx !== undefined && target.type === 'number') {
-            // 实时更新
-            target.dispatchEvent(new Event('change', { bubbles: true }));
-          }
-        });
+        function enterSystem() {
+            document.getElementById('auth-screen').style.display = 'none';
+            document.getElementById('main-system').style.display = 'block';
+            const firstMenu = document.querySelector('.menu-title');
+            toggleMenu(firstMenu);
+            showPage('purchase-in');
+        }
 
-        // 删除按钮
-        listEl?.addEventListener('click', function(e) {
-          if (e.target.classList.contains('btn-del')) {
-            const idx = parseInt(e.target.dataset.idx);
-            if (confirm('确定删除此记录吗？')) {
-              const records = getStoreData(STORE_KEYS[moduleKey]);
-              records.splice(idx, 1);
-              setStoreData(STORE_KEYS[moduleKey], records);
-              refreshModuleContent(moduleKey);
+        // ==================== 菜单切换 ====================
+        function toggleMenu(el) {
+            const wasExpanded = el.classList.contains('expanded');
+            document.querySelectorAll('.menu-title').forEach(m => m.classList.remove('expanded'));
+            document.querySelectorAll('.submenu').forEach(s => s.classList.remove('open'));
+
+            if (!wasExpanded) {
+                el.classList.add('expanded');
+                el.nextElementSibling.classList.add('open');
             }
-          }
-        });
-      }
-
-      // ==================== 刷新 ====================
-      function refreshModuleContent(moduleKey) {
-        const container = document.getElementById('moduleContent');
-        if (container) {
-          container.innerHTML = renderModule(moduleKey);
-          bindModuleEvents(moduleKey);
-        }
-      }
-
-      function refreshApp() {
-        const inner = document.getElementById('appInner');
-        const user = getSessionUser();
-        if (!user) {
-          inner.innerHTML = renderAuth();
-          bindAuthEvents();
-        } else {
-          inner.innerHTML = renderMain(user);
-          bindMainEvents();
-        }
-      }
-
-      // ==================== 初始化 ====================
-      function init() {
-        // 版本检查
-        const savedVer = localStorage.getItem(VERSION_KEY);
-        if (savedVer !== APP_VERSION) {
-          localStorage.setItem(VERSION_KEY, APP_VERSION);
         }
 
-        // 确保用户数据存在
-        if (!localStorage.getItem(USERS_KEY)) {
-          localStorage.setItem(USERS_KEY, JSON.stringify(DEFAULT_USERS));
+        // ==================== 页面渲染 ====================
+        let currentPage = '';
+
+        function showPage(page) {
+            currentPage = page;
+            document.querySelectorAll('.submenu-item').forEach(i => i.classList.remove('active'));
+            if (event && event.target) {
+                event.target.classList.add('active');
+            } else {
+                // fallback: 根据page高亮对应菜单项
+                document.querySelectorAll('.submenu-item').forEach(item => {
+                    const onclick = item.getAttribute('onclick');
+                    if (onclick && onclick.includes(`'${page}'`)) {
+                        item.classList.add('active');
+                    }
+                });
+            }
+
+            const pages = {
+                'purchase-in': { title: '采购入库', type: 'purchaseIn' },
+                'purchase-exchange': { title: '采购换货', type: 'purchaseExchange' },
+                'purchase-return': { title: '采购退货', type: 'purchaseReturn' },
+                'retail-order': { title: '零售订单', type: 'retailOrder' },
+                'retail-sell': { title: '零售开单', type: 'retailSell' },
+                'retail-exchange': { title: '零售换货', type: 'retailExchange' },
+                'retail-return': { title: '零售退货', type: 'retailReturn' },
+                'stock-daily': { title: '库存日报', type: 'stock' },
+                'sample-display': { title: '门店上样', type: 'sampleDisplay' },
+                'sample-sell': { title: '样机销售', type: 'sampleSell' }
+            };
+
+            const info = pages[page];
+            renderContent(info.title, info.type);
         }
 
-        // 确保各模块数据存在
-        Object.values(STORE_KEYS).forEach(key => {
-          if (!localStorage.getItem(key)) {
-            localStorage.setItem(key, JSON.stringify([]));
-          }
-        });
+        function renderContent(title, dataType) {
+            const area = document.getElementById('content-area');
 
-        // 3秒后显示
-        setTimeout(() => {
-          document.getElementById('appContainer').classList.add('show');
-          refreshApp();
-        }, 3000);
-      }
+            let html = `
+            <div class="content-header">
+                <div class="page-title">${title}</div>
+                <div class="header-actions">
+                    <button class="btn btn-default" onclick="importExcel('${dataType}')">导入Excel</button>
+                    <button class="btn btn-success" onclick="exportExcel('${dataType}')">导出汇总表</button>
+                    <button class="btn btn-primary" onclick="openAddForm('${dataType}')">+ 新增</button>
+                </div>
+            </div>
+            <div class="content-body">
+                <div class="toolbar">
+                    <input type="text" placeholder="搜索关键词..." id="search-input" oninput="renderTable('${dataType}')">
+                    <select id="warehouse-filter" onchange="renderTable('${dataType}')" style="display:${dataType.includes('purchase')||dataType==='stock'?'inline-block':'none'}">
+                        <option value="">全部仓库</option>
+                        <option value="新库房">新库房</option>
+                        <option value="老库房">老库房</option>
+                    </select>
+                </div>
+                <div class="table-wrapper">
+                    <table class="data-table" id="data-table"></table>
+                </div>
+            </div>
+            <input type="file" id="file-import" accept=".xls,.xlsx" style="display:none" onchange="handleFileImport('${dataType}')">
+            `;
 
-      // 启动
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-      } else {
-        init();
-      }
-    })();
-  </script>
+            area.innerHTML = html;
+            renderTable(dataType);
+        }
+
+        // ==================== 表格列定义 ====================
+        const tableColumns = {
+            purchaseIn: [
+                { key: 'orderNo', label: '单号' }, { key: 'supplier', label: '供应商' },
+                { key: 'purchaseDate', label: '采购日期' }, { key: 'receiveDate', label: '收货日期' },
+                { key: 'brand', label: '商品品牌' }, { key: 'goodsName', label: '商品名称' },
+                { key: 'model', label: '商品型号' }, { key: 'quantity', label: '数量' },
+                { key: 'price', label: '单价' }, { key: 'amount', label: '金额' },
+                { key: 'invoiced', label: '是否已开票' }, { key: 'invoiceAmount', label: '开票金额' },
+                { key: 'invoiceDate', label: '开票日期' }, { key: 'warehouse', label: '归属仓库' },
+                { key: 'remark', label: '备注' }
+            ],
+            retailOrder: [
+                { key: 'orderNo', label: '单号' }, { key: 'orderSource', label: '订单来源' },
+                { key: 'orderDate', label: '订单日期' }, { key: 'customer', label: '客户姓名' },
+                { key: 'phone', label: '联系电话' }, { key: 'salesman', label: '销售人员' },
+                { key: 'channel', label: '销售渠道' }, { key: 'goodsName', label: '商品名称' },
+                { key: 'model', label: '商品规格型号' }, { key: 'sellPrice', label: '销售价格' },
+                { key: 'retailPrice', label: '零售价格' }, { key: 'discount', label: '折扣' },
+                { key: 'payMethod', label: '收款方式' }, { key: 'payAmount', label: '收款金额' },
+                { key: 'hasBalance', label: '是否有尾款' }, { key: 'subsidy', label: '是否国补' },
+                { key: 'address', label: '安装地址' }, { key: 'installed', label: '是否安装' },
+                { key: 'salesRecorded', label: '是否录销量' }, { key: 'invoiced', label: '是否开发票' },
+                { key: 'costPrice', label: '进货价' }, { key: 'profit', label: '利润' },
+                { key: 'remark', label: '备注' }
+            ],
+            stock: [
+                { key: 'brand', label: '商品品牌' }, { key: 'goodsName', label: '商品名称' },
+                { key: 'model', label: '商品型号' }, { key: 'bookStock', label: '账面库存' },
+                { key: 'salesOrder', label: '销售订货' }, { key: 'availableStock', label: '可用库存' },
+                { key: 'warehouse', label: '归属仓库' }
+            ],
+            sampleDisplay: [
+                { key: 'orderNo', label: '单号' }, { key: 'storeAddress', label: '上样门店地址' },
+                { key: 'displayDate', label: '上样日期' }, { key: 'brand', label: '商品品牌' },
+                { key: 'goodsName', label: '商品名称' }, { key: 'model', label: '商品型号' },
+                { key: 'quantity', label: '数量' }, { key: 'price', label: '价格' },
+                { key: 'amount', label: '金额' }, { key: 'manager', label: '负责人' }
+            ],
+            sampleSell: [
+                { key: 'orderNo', label: '单号' }, { key: 'orderSource', label: '订单来源' },
+                { key: 'orderDate', label: '订单日期' }, { key: 'customer', label: '客户姓名' },
+                { key: 'phone', label: '联系电话' }, { key: 'salesman', label: '销售人员' },
+                { key: 'channel', label: '销售渠道' }, { key: 'goodsName', label: '商品名称' },
+                { key: 'model', label: '商品规格型号' }, { key: 'sellPrice', label: '销售价格' },
+                { key: 'retailPrice', label: '零售价格' }, { key: 'discount', label: '折扣' },
+                { key: 'payMethod', label: '收款方式' }, { key: 'payAmount', label: '收款金额' },
+                { key: 'hasBalance', label: '是否有尾款' }, { key: 'subsidy', label: '是否国补' },
+                { key: 'address', label: '安装地址' }, { key: 'installed', label: '是否安装' },
+                { key: 'salesRecorded', label: '是否录销量' }, { key: 'invoiced', label: '是否开发票' },
+                { key: 'costPrice', label: '进货价' }, { key: 'profit', label: '利润' },
+                { key: 'remark', label: '备注' }
+            ]
+        };
+
+        // 采购换货、采购退货字段同采购入库
+        tableColumns.purchaseExchange = tableColumns.purchaseIn;
+        tableColumns.purchaseReturn = tableColumns.purchaseIn;
+        tableColumns.retailSell = tableColumns.retailOrder;
+        tableColumns.retailExchange = tableColumns.retailOrder;
+        tableColumns.retailReturn = tableColumns.retailOrder;
+
+        // ==================== 渲染表格 ====================
+        function renderTable(dataType) {
+            const table = document.getElementById('data-table');
+            const cols = tableColumns[dataType];
+            let data = appData[dataType] || [];
+
+            const keyword = document.getElementById('search-input')?.value || '';
+            if (keyword) {
+                data = data.filter(row =>
+                    Object.values(row).some(v => String(v).includes(keyword))
+                );
+            }
+
+            const whFilter = document.getElementById('warehouse-filter');
+            if (whFilter && whFilter.value && data[0]?.warehouse !== undefined) {
+                data = data.filter(row => row.warehouse === whFilter.value);
+            }
+
+            let html = '<thead><tr>';
+            cols.forEach(c => html += `<th>${c.label}</th>`);
+            html += '<th style="width:100px">操作</th></tr></thead><tbody>';
+
+            if (data.length === 0) {
+                html += `<tr><td colspan="${cols.length + 1}" class="empty-tip">暂无数据，请新增或导入</td></tr>`;
+            } else {
+                data.forEach((row, idx) => {
+                    html += '<tr>';
+                    cols.forEach(c => {
+                        html += `<td>${row[c.key] !== undefined && row[c.key] !== null ? row[c.key] : ''}</td>`;
+                    });
+                    html += `<td>
+                        <button class="action-btn edit" onclick="editRow('${dataType}', ${idx})">编辑</button>
+                        <button class="action-btn delete" onclick="deleteRow('${dataType}', ${idx})">删除</button>
+                    </td>`;
+                    html += '</tr>';
+                });
+            }
+            html += '</tbody>';
+            table.innerHTML = html;
+        }
+
+        // ==================== 生成单号 ====================
+        function genOrderNo(prefix, dataType) {
+            const list = appData[dataType] || [];
+            const num = list.length.toString().padStart(4, '0');
+            return prefix + num;
+        }
+
+        // ==================== 新增/编辑弹窗 ====================
+        function openAddForm(dataType) {
+            const isRetail = dataType.includes('retail') || dataType === 'sampleSell';
+            const isPurchase = dataType.includes('purchase');
+            const isSample = dataType === 'sampleDisplay';
+
+            let formHtml = '';
+
+            if (isPurchase || dataType === 'purchaseExchange' || dataType === 'purchaseReturn') {
+                formHtml = buildPurchaseForm(dataType);
+            } else if (isRetail || dataType === 'sampleSell') {
+                formHtml = buildRetailForm(dataType);
+            } else if (isSample) {
+                formHtml = buildSampleDisplayForm();
+            } else if (dataType === 'stock') {
+                formHtml = buildStockForm();
+            }
+
+            document.getElementById('modal-title').textContent = '新增记录';
+            document.getElementById('modal-body').innerHTML = formHtml;
+            document.getElementById('modal-footer').innerHTML = `
+                <button class="btn btn-default" onclick="closeModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveRow('${dataType}')">保存</button>
+            `;
+            document.getElementById('modal-mask').classList.add('show');
+
+            const prefixMap = {
+                purchaseIn: 'RK-',
+                purchaseExchange: 'HH-',
+                purchaseReturn: 'TH-',
+                retailOrder: 'DD-',
+                retailSell: 'KD-',
+                retailExchange: 'ZH-',
+                retailReturn: 'TT-',
+                sampleDisplay: 'SY-',
+                sampleSell: 'YX-'
+            };
+            if (prefixMap[dataType]) {
+                document.getElementById('f_orderNo').value = genOrderNo(prefixMap[dataType], dataType);
+            }
+
+            bindAutoCalc();
+        }
+
+        function editRow(dataType, idx) {
+            openAddForm(dataType);
+            const row = appData[dataType][idx];
+            Object.keys(row).forEach(key => {
+                const el = document.getElementById('f_' + key);
+                if (el) el.value = row[key];
+            });
+            document.getElementById('modal-title').textContent = '编辑记录';
+            document.getElementById('modal-footer').innerHTML = `
+                <button class="btn btn-default" onclick="closeModal()">取消</button>
+                <button class="btn btn-primary" onclick="updateRow('${dataType}', ${idx})">更新</button>
+            `;
+        }
+
+        function saveRow(dataType) {
+            const row = collectFormData();
+
+            if (row.quantity && row.price) row.amount = (row.quantity * row.price).toFixed(2);
+            if (row.sellPrice && row.retailPrice) row.discount = (row.sellPrice / row.retailPrice).toFixed(2);
+            if (row.sellPrice && row.costPrice) row.profit = (row.sellPrice - row.costPrice).toFixed(2);
+            if (row.payAmount && row.sellPrice) row.hasBalance = row.payAmount < row.sellPrice ? '是' : '否';
+
+            if (!appData[dataType]) appData[dataType] = [];
+            appData[dataType].push(row);
+            saveData(appData);
+            closeModal();
+            renderTable(dataType);
+            updateStock();
+        }
+
+        function updateRow(dataType, idx) {
+            const row = collectFormData();
+            if (row.quantity && row.price) row.amount = (row.quantity * row.price).toFixed(2);
+            if (row.sellPrice && row.retailPrice) row.discount = (row.sellPrice / row.retailPrice).toFixed(2);
+            if (row.sellPrice && row.costPrice) row.profit = (row.sellPrice - row.costPrice).toFixed(2);
+            if (row.payAmount && row.sellPrice) row.hasBalance = row.payAmount < row.sellPrice ? '是' : '否';
+
+            appData[dataType][idx] = row;
+            saveData(appData);
+            closeModal();
+            renderTable(dataType);
+            updateStock();
+        }
+
+        function deleteRow(dataType, idx) {
+            if (!confirm('确定删除此条记录？')) return;
+            appData[dataType].splice(idx, 1);
+            saveData(appData);
+            renderTable(dataType);
+            updateStock();
+        }
+
+        function collectFormData() {
+            const data = {};
+            document.querySelectorAll('#modal-body input, #modal-body select, #modal-body textarea').forEach(el => {
+                if (el.id.startsWith('f_')) {
+                    const key = el.id.substring(2);
+                    data[key] = el.value;
+                }
+            });
+            return data;
+        }
+
+        function bindAutoCalc() {
+            const qty = document.getElementById('f_quantity');
+            const price = document.getElementById('f_price');
+            const amount = document.getElementById('f_amount');
+            if (qty && price && amount) {
+                const calc = () => {
+                    if (qty.value && price.value) amount.value = (qty.value * price.value).toFixed(2);
+                };
+                qty.addEventListener('input', calc);
+                price.addEventListener('input', calc);
+            }
+
+            const sp = document.getElementById('f_sellPrice');
+            const rp = document.getElementById('f_retailPrice');
+            const disc = document.getElementById('f_discount');
+            if (sp && rp && disc) {
+                const calc = () => {
+                    if (sp.value && rp.value && rp.value > 0) disc.value = (sp.value / rp.value).toFixed(2);
+                };
+                sp.addEventListener('input', calc);
+                rp.addEventListener('input', calc);
+            }
+
+            const cp = document.getElementById('f_costPrice');
+            const profit = document.getElementById('f_profit');
+            if (sp && cp && profit) {
+                const calc = () => {
+                    if (sp.value && cp.value) profit.value = (sp.value - cp.value).toFixed(2);
+                };
+                sp.addEventListener('input', calc);
+                cp.addEventListener('input', calc);
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('modal-mask').classList.remove('show');
+        }
+
+        // ==================== 表单构建 ====================
+        function buildPurchaseForm() {
+            return `
+            <div class="form-grid">
+                <div class="form-item"><label>单号</label><input id="f_orderNo" readonly></div>
+                <div class="form-item"><label>供应商</label><input id="f_supplier"></div>
+                <div class="form-item"><label>采购日期</label><input id="f_purchaseDate" type="date"></div>
+                <div class="form-item"><label>收货日期</label><input id="f_receiveDate" type="date"></div>
+                <div class="form-item"><label>商品品牌</label><input id="f_brand"></div>
+                <div class="form-item"><label>商品名称</label><input id="f_goodsName"></div>
+                <div class="form-item"><label>商品型号</label><input id="f_model"></div>
+                <div class="form-item"><label>数量</label><input id="f_quantity" type="number"></div>
+                <div class="form-item"><label>单价</label><input id="f_price" type="number" step="0.01"></div>
+                <div class="form-item"><label>金额</label><input id="f_amount" readonly></div>
+                <div class="form-item"><label>是否已开票</label>
+                    <select id="f_invoiced"><option value="否">否</option><option value="是">是</option></select>
+                </div>
+                <div class="form-item"><label>开票金额</label><input id="f_invoiceAmount" type="number" step="0.01"></div>
+                <div class="form-item"><label>开票日期</label><input id="f_invoiceDate" type="date"></div>
+                <div class="form-item"><label>归属仓库</label>
+                    <select id="f_warehouse"><option value="新库房">新库房</option><option value="老库房">老库房</option></select>
+                </div>
+                <div class="form-item full"><label>备注</label><textarea id="f_remark" rows="2"></textarea></div>
+            </div>`;
+        }
+
+        function buildRetailForm() {
+            return `
+            <div class="form-grid">
+                <div class="form-item"><label>单号</label><input id="f_orderNo" readonly></div>
+                <div class="form-item"><label>订单来源</label><input id="f_orderSource"></div>
+                <div class="form-item"><label>订单日期</label><input id="f_orderDate" type="date"></div>
+                <div class="form-item"><label>客户姓名</label><input id="f_customer"></div>
+                <div class="form-item"><label>联系电话</label><input id="f_phone"></div>
+                <div class="form-item"><label>销售人员</label><input id="f_salesman"></div>
+                <div class="form-item"><label>销售渠道</label><input id="f_channel"></div>
+                <div class="form-item"><label>商品名称</label><input id="f_goodsName"></div>
+                <div class="form-item"><label>商品规格型号</label><input id="f_model"></div>
+                <div class="form-item"><label>销售价格</label><input id="f_sellPrice" type="number" step="0.01"></div>
+                <div class="form-item"><label>零售价格</label><input id="f_retailPrice" type="number" step="0.01"></div>
+                <div class="form-item"><label>折扣</label><input id="f_discount" readonly></div>
+                <div class="form-item"><label>收款方式</label>
+                    <select id="f_payMethod">
+                        <option value="佳洛顺驰">佳洛顺驰</option>
+                        <option value="洛高">洛高</option>
+                        <option value="商场">商场</option>
+                        <option value="个人">个人</option>
+                    </select>
+                </div>
+                <div class="form-item"><label>收款金额</label><input id="f_payAmount" type="number" step="0.01"></div>
+                <div class="form-item"><label>是否有尾款</label><input id="f_hasBalance" readonly></div>
+
+                <div class="form-item full">
+                    <div class="sub-fieldset">
+                        <legend>是否国补</legend>
+                        <div class="form-grid" style="grid-template-columns: repeat(4,1fr);">
+                            <div class="form-item"><label>POS机归属</label>
+                                <select id="f_posOwner"><option value="佳洛顺驰">佳洛顺驰</option><option value="洛高">洛高</option></select>
+                            </div>
+                            <div class="form-item"><label>POS机交易金额</label><input id="f_posAmount" type="number" step="0.01"></div>
+                            <div class="form-item"><label>补贴金额</label><input id="f_subsidyAmount" type="number" step="0.01"></div>
+                            <div class="form-item"><label>POS机交易日期</label><input id="f_posDate" type="date"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-item full"><label>安装地址</label><input id="f_address"></div>
+
+                <div class="form-item">
+                    <label>是否安装</label>
+                    <select id="f_installed">
+                        <option value="否">否</option><option value="是">是</option>
+                    </select>
+                </div>
+                <div class="form-item"><label>安装日期</label><input id="f_installDate" type="date"></div>
+                <div class="form-item"><label>安装是否录系统</label>
+                    <select id="f_installRecorded"><option value="否">否</option><option value="是">是</option></select>
+                </div>
+
+                <div class="form-item"><label>是否录销量</label>
+                    <select id="f_salesRecorded"><option value="否">否</option><option value="是">是</option></select>
+                </div>
+                <div class="form-item"><label>录销量日期</label><input id="f_salesRecordDate" type="date"></div>
+                <div class="form-item"><label>是否开发票</label>
+                    <select id="f_invoiced"><option value="否">否</option><option value="是">是</option></select>
+                </div>
+                <div class="form-item"><label>开票日期</label><input id="f_invoiceDate" type="date"></div>
+
+                <div class="form-item"><label>进货价</label><input id="f_costPrice" type="number" step="0.01"></div>
+                <div class="form-item"><label>利润</label><input id="f_profit" readonly></div>
+                <div class="form-item"></div>
+
+                <div class="form-item full"><label>备注</label><textarea id="f_remark" rows="2"></textarea></div>
+            </div>`;
+        }
+
+        function buildSampleDisplayForm() {
+            return `
+            <div class="form-grid">
+                <div class="form-item"><label>单号</label><input id="f_orderNo" readonly></div>
+                <div class="form-item"><label>上样门店地址</label><input id="f_storeAddress"></div>
+                <div class="form-item"><label>上样日期</label><input id="f_displayDate" type="date"></div>
+                <div class="form-item"><label>商品品牌</label><input id="f_brand"></div>
+                <div class="form-item"><label>商品名称</label><input id="f_goodsName"></div>
+                <div class="form-item"><label>商品型号</label><input id="f_model"></div>
+                <div class="form-item"><label>数量</label><input id="f_quantity" type="number"></div>
+                <div class="form-item"><label>价格</label><input id="f_price" type="number" step="0.01"></div>
+                <div class="form-item"><label>金额</label><input id="f_amount" readonly></div>
+                <div class="form-item"><label>负责人</label><input id="f_manager"></div>
+            </div>`;
+        }
+
+        function buildStockForm() {
+            return `
+            <div class="form-grid">
+                <div class="form-item"><label>商品品牌</label><input id="f_brand"></div>
+                <div class="form-item"><label>商品名称</label><input id="f_goodsName"></div>
+                <div class="form-item"><label>商品型号</label><input id="f_model"></div>
+                <div class="form-item"><label>账面库存</label><input id="f_bookStock" type="number"></div>
+                <div class="form-item"><label>销售订货</label><input id="f_salesOrder" type="number"></div>
+                <div class="form-item"><label>可用库存</label><input id="f_availableStock" readonly></div>
+                <div class="form-item"><label>归属仓库</label>
+                    <select id="f_warehouse"><option value="新库房">新库房</option><option value="老库房">老库房</option></select>
+                </div>
+            </div>`;
+        }
+
+        // ==================== 库存自动更新 ====================
+        function updateStock() {
+            const stockMap = {};
+
+            (appData.purchaseIn || []).forEach(item => {
+                const key = `${item.brand}_${item.goodsName}_${item.model}_${item.warehouse}`;
+                if (!stockMap[key]) {
+                    stockMap[key] = { brand: item.brand, goodsName: item.goodsName, model: item.model,
+                        warehouse: item.warehouse, bookStock: 0, salesOrder: 0 };
+                }
+                stockMap[key].bookStock += Number(item.quantity) || 0;
+            });
+
+            (appData.purchaseReturn || []).forEach(item => {
+                const key = `${item.brand}_${item.goodsName}_${item.model}_${item.warehouse}`;
+                if (!stockMap[key]) {
+                    stockMap[key] = { brand: item.brand, goodsName: item.goodsName, model: item.model,
+                        warehouse: item.warehouse, bookStock: 0, salesOrder: 0 };
+                }
+                stockMap[key].bookStock -= Number(item.quantity) || 0;
+            });
+
+            (appData.retailSell || []).forEach(item => {
+                const key = `_${item.goodsName}_${item.model}_新库房`;
+                if (!stockMap[key]) {
+                    stockMap[key] = { brand: '', goodsName: item.goodsName, model: item.model, warehouse: '新库房',
+                        bookStock: 0, salesOrder: 0 };
+                }
+                stockMap[key].bookStock -= 1;
+            });
+
+            (appData.retailReturn || []).forEach(item => {
+                const key = `_${item.goodsName}_${item.model}_新库房`;
+                if (!stockMap[key]) {
+                    stockMap[key] = { brand: '', goodsName: item.goodsName, model: item.model, warehouse: '新库房',
+                        bookStock: 0, salesOrder: 0 };
+                }
+                stockMap[key].bookStock += 1;
+            });
+
+            (appData.retailOrder || []).forEach(item => {
+                const key = `_${item.goodsName}_${item.model}_新库房`;
+                if (!stockMap[key]) {
+                    stockMap[key] = { brand: '', goodsName: item.goodsName, model: item.model, warehouse: '新库房',
+                        bookStock: 0, salesOrder: 0 };
+                }
+                stockMap[key].salesOrder += 1;
+            });
+
+            (appData.sampleDisplay || []).forEach(item => {
+                const key = `${item.brand}_${item.goodsName}_${item.model}_新库房`;
+                if (!stockMap[key]) {
+                    stockMap[key] = { brand: item.brand, goodsName: item.goodsName, model: item.model,
+                        warehouse: '新库房', bookStock: 0, salesOrder: 0 };
+                }
+                stockMap[key].bookStock -= Number(item.quantity) || 0;
+            });
+
+            appData.stock = Object.values(stockMap).map(s => ({
+                ...s,
+                availableStock: s.bookStock - s.salesOrder
+            }));
+
+            saveData(appData);
+        }
+
+        // ==================== Excel 导入 ====================
+        function importExcel(dataType) {
+            document.getElementById('file-import').click();
+        }
+
+        function handleFileImport(dataType) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                const json = XLSX.utils.sheet_to_json(sheet);
+
+                const colMap = {};
+                tableColumns[dataType].forEach(c => colMap[c.label] = c.key);
+
+                let imported = 0;
+                json.forEach(row => {
+                    const mapped = {};
+                    Object.keys(row).forEach(k => {
+                        if (colMap[k]) mapped[colMap[k]] = row[k];
+                    });
+
+                    if (!mapped.orderNo) {
+                        const prefixMap = {
+                            purchaseIn: 'RK-',
+                            purchaseExchange: 'HH-',
+                            purchaseReturn: 'TH-',
+                            retailOrder: 'DD-',
+                            retailSell: 'KD-',
+                            retailExchange: 'ZH-',
+                            retailReturn: 'TT-',
+                            sampleDisplay: 'SY-',
+                            sampleSell: 'YX-'
+                        };
+                        mapped.orderNo = genOrderNo(prefixMap[dataType] || 'IM-', dataType);
+                    }
+
+                    if (mapped.quantity && mapped.price) mapped.amount = (mapped.quantity * mapped.price).toFixed(2);
+                    if (mapped.sellPrice && mapped.retailPrice) mapped.discount = (mapped.sellPrice / mapped.retailPrice)
+                        .toFixed(2);
+                    if (mapped.sellPrice && mapped.costPrice) mapped.profit = (mapped.sellPrice - mapped.costPrice).toFixed(
+                    2);
+
+                    if (!appData[dataType]) appData[dataType] = [];
+                    appData[dataType].push(mapped);
+                    imported++;
+                });
+
+                saveData(appData);
+                updateStock();
+                renderTable(dataType);
+                alert(`成功导入 ${imported} 条记录`);
+            };
+            reader.readAsArrayBuffer(file);
+            event.target.value = '';
+        }
+
+        // ==================== ★★★ 新版导出功能（含配置+汇总）★★★ ====================
+        function exportExcel(dataType) {
+            // 显示导出配置弹窗
+            showExportConfig(dataType);
+        }
+
+        function showExportConfig(dataType) {
+            const cols = tableColumns[dataType];
+            if (!cols) {
+                alert('该模块暂无导出配置');
+                return;
+            }
+
+            // 构建字段复选框
+            let fieldHtml = '';
+            cols.forEach((c, idx) => {
+                fieldHtml += `
+                    <label>
+                        <input type="checkbox" class="export-field-cb" data-key="${c.key}" value="${c.key}" checked>
+                        ${c.label}
+                    </label>
+                `;
+            });
+
+            const modalBody = `
+                <div style="margin-bottom:10px;">
+                    <span style="font-weight:500;font-size:14px;">选择要导出的字段：</span>
+                    <span class="select-all-link" onclick="toggleExportFields(true)">全选</span>
+                    <span class="select-all-link" onclick="toggleExportFields(false)">取消全选</span>
+                    <span class="field-count">已选 <span id="selected-count">${cols.length}</span> 个字段</span>
+                </div>
+                <div class="export-field-grid" id="export-field-grid">
+                    ${fieldHtml}
+                </div>
+                <div class="export-options">
+                    <label>
+                        <input type="checkbox" id="export-summary" checked>
+                        显示汇总行（价格汇总）
+                    </label>
+                    <label>
+                        <input type="checkbox" id="export-filter-warehouse" ${dataType.includes('purchase')||dataType==='stock'?'checked':''} ${dataType.includes('purchase')||dataType==='stock'?'':'disabled'}>
+                        按仓库分组汇总
+                    </label>
+                    <label style="color:#999;font-size:12px;margin-left:auto;">
+                        <span id="data-count">共 ${appData[dataType]?.length || 0} 条数据</span>
+                    </label>
+                </div>
+            `;
+
+            document.getElementById('modal-title').textContent = '导出配置';
+            document.getElementById('modal-body').innerHTML = modalBody;
+            document.getElementById('modal-footer').innerHTML = `
+                <button class="btn btn-default" onclick="closeModal()">取消</button>
+                <button class="btn btn-success" onclick="generateExcel('${dataType}')">确认导出</button>
+            `;
+            document.getElementById('modal-mask').classList.add('show');
+
+            // 监听复选框变化，更新计数
+            document.querySelectorAll('.export-field-cb').forEach(cb => {
+                cb.addEventListener('change', updateExportFieldCount);
+            });
+            updateExportFieldCount();
+
+            // 如果数据类型不支持仓库，禁用仓库分组选项
+            if (!dataType.includes('purchase') && dataType !== 'stock') {
+                const whOpt = document.getElementById('export-filter-warehouse');
+                if (whOpt) whOpt.disabled = true;
+            }
+        }
+
+        function updateExportFieldCount() {
+            const checked = document.querySelectorAll('.export-field-cb:checked').length;
+            const el = document.getElementById('selected-count');
+            if (el) el.textContent = checked;
+        }
+
+        function toggleExportFields(selectAll) {
+            document.querySelectorAll('.export-field-cb').forEach(cb => {
+                cb.checked = selectAll;
+            });
+            updateExportFieldCount();
+        }
+
+        function generateExcel(dataType) {
+            const cols = tableColumns[dataType];
+            const data = appData[dataType] || [];
+
+            // 获取用户选择的字段
+            const selectedKeys = [];
+            document.querySelectorAll('.export-field-cb:checked').forEach(cb => {
+                selectedKeys.push(cb.value);
+            });
+
+            if (selectedKeys.length === 0) {
+                alert('请至少选择一个字段');
+                return;
+            }
+
+            const showSummary = document.getElementById('export-summary')?.checked || false;
+            const groupByWarehouse = document.getElementById('export-filter-warehouse')?.checked || false;
+
+            // 获取选中的列标签
+            const selectedCols = cols.filter(c => selectedKeys.includes(c.key));
+
+            // 判断哪些列是数值列（用于汇总）
+            const numericKeys = ['quantity', 'price', 'amount', 'invoiceAmount', 'sellPrice', 'retailPrice',
+                'payAmount', 'costPrice', 'profit', 'bookStock', 'salesOrder', 'availableStock'
+            ];
+            const numericCols = selectedCols.filter(c => numericKeys.includes(c.key));
+
+            // 准备导出数据
+            let exportRows = [];
+            let summaryData = {};
+
+            if (groupByWarehouse && (dataType.includes('purchase') || dataType === 'stock')) {
+                // 按仓库分组
+                const groups = {};
+                data.forEach(row => {
+                    const wh = row.warehouse || '未指定';
+                    if (!groups[wh]) groups[wh] = [];
+                    groups[wh].push(row);
+                });
+
+                Object.keys(groups).forEach(wh => {
+                    const rows = groups[wh];
+                    // 添加组标题行
+                    const titleRow = {};
+                    selectedCols.forEach(c => {
+                        titleRow[c.key] = c.key === 'warehouse' ? `【${wh}】` : '';
+                    });
+                    exportRows.push(titleRow);
+
+                    // 添加数据行
+                    rows.forEach(row => {
+                        const rowData = {};
+                        selectedCols.forEach(c => {
+                            rowData[c.key] = row[c.key] !== undefined && row[c.key] !== null ?
+                                row[c.key] : '';
+                        });
+                        exportRows.push(rowData);
+                    });
+
+                    // 添加小计行
+                    const subRow = {};
+                    selectedCols.forEach(c => {
+                        if (numericCols.some(nc => nc.key === c.key)) {
+                            let sum = 0;
+                            rows.forEach(r => {
+                                const val = parseFloat(r[c.key]);
+                                if (!isNaN(val)) sum += val;
+                            });
+                            subRow[c.key] = sum.toFixed(2);
+                        } else if (c.key === 'warehouse') {
+                            subRow[c.key] = `小计 (${wh})`;
+                        } else {
+                            subRow[c.key] = '';
+                        }
+                    });
+                    exportRows.push(subRow);
+
+                    // 空行分隔
+                    const emptyRow = {};
+                    selectedCols.forEach(c => { emptyRow[c.key] = ''; });
+                    exportRows.push(emptyRow);
+                });
+
+                // 总计行
+                if (showSummary) {
+                    const totalRow = {};
+                    selectedCols.forEach(c => {
+                        if (numericCols.some(nc => nc.key === c.key)) {
+                            let sum = 0;
+                            data.forEach(r => {
+                                const val = parseFloat(r[c.key]);
+                                if (!isNaN(val)) sum += val;
+                            });
+                            totalRow[c.key] = sum.toFixed(2);
+                        } else if (c.key === 'warehouse') {
+                            totalRow[c.key] = '总计';
+                        } else {
+                            totalRow[c.key] = '';
+                        }
+                    });
+                    exportRows.push(totalRow);
+                }
+            } else {
+                // 不分组，直接导出所有数据
+                data.forEach(row => {
+                    const rowData = {};
+                    selectedCols.forEach(c => {
+                        rowData[c.key] = row[c.key] !== undefined && row[c.key] !== null ? row[c.key] :
+                            '';
+                    });
+                    exportRows.push(rowData);
+                });
+
+                // 汇总行
+                if (showSummary && exportRows.length > 0) {
+                    const totalRow = {};
+                    selectedCols.forEach(c => {
+                        if (numericCols.some(nc => nc.key === c.key)) {
+                            let sum = 0;
+                            data.forEach(r => {
+                                const val = parseFloat(r[c.key]);
+                                if (!isNaN(val)) sum += val;
+                            });
+                            totalRow[c.key] = sum.toFixed(2);
+                        } else {
+                            totalRow[c.key] = '';
+                        }
+                    });
+                    // 在第一列显示"汇总"
+                    if (selectedCols.length > 0) {
+                        totalRow[selectedCols[0].key] = '汇总';
+                    }
+                    exportRows.push(totalRow);
+                }
+            }
+
+            // 构建Excel数据（二维数组）
+            const excelData = [];
+            // 表头
+            const header = selectedCols.map(c => c.label);
+            excelData.push(header);
+
+            // 数据行
+            exportRows.forEach(row => {
+                const rowArr = selectedCols.map(c => {
+                    let val = row[c.key];
+                    if (val === undefined || val === null) val = '';
+                    // 如果是数字，保留两位小数显示
+                    if (typeof val === 'number' && !Number.isInteger(val)) {
+                        val = Number(val).toFixed(2);
+                    }
+                    return val;
+                });
+                excelData.push(rowArr);
+            });
+
+            // 创建工作簿
+            const ws = XLSX.utils.aoa_to_sheet(excelData);
+
+            // 设置列宽
+            const colWidths = selectedCols.map(c => ({ wch: Math.max(c.label.length * 2, 12) }));
+            ws['!cols'] = colWidths;
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, '汇总表');
+
+            const titleMap = {
+                purchaseIn: '采购入库汇总表',
+                purchaseExchange: '采购换货汇总表',
+                purchaseReturn: '采购退货汇总表',
+                retailOrder: '零售订单汇总表',
+                retailSell: '零售开单汇总表',
+                retailExchange: '零售换货汇总表',
+                retailReturn: '零售退货汇总表',
+                stock: '库存日报表',
+                sampleDisplay: '门店上样汇总表',
+                sampleSell: '样机销售汇总表'
+            };
+
+            const fileName = `${titleMap[dataType] || '导出数据'}.xlsx`;
+            XLSX.writeFile(wb, fileName);
+            closeModal();
+        }
+
+        // ==================== 页面就绪 ====================
+        // 更新库存
+        updateStock();
+    </script>
 </body>
 </html>
