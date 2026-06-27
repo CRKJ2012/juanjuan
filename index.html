@@ -322,6 +322,13 @@
         .btn-danger:hover {
             background: #c0392b;
         }
+        .btn-warning {
+            background: #f39c12;
+            color: #fff;
+        }
+        .btn-warning:hover {
+            background: #e67e22;
+        }
 
         .content-body {
             padding: 20px 25px;
@@ -603,36 +610,6 @@
             font-size: 12px;
             color: #999;
             margin-left: 8px;
-        }
-
-        /* 导出筛选行 */
-        .export-filter-row {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 12px 18px;
-            margin-bottom: 12px;
-            padding: 10px 14px;
-            background: #f8f9fa;
-            border-radius: 6px;
-        }
-        .export-filter-row label {
-            font-size: 13px;
-            color: #444;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .export-filter-row input {
-            padding: 5px 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 13px;
-            outline: none;
-            width: 180px;
-        }
-        .export-filter-row input:focus {
-            border-color: #e94560;
         }
 
         /* 基础信息表格 */
@@ -1459,7 +1436,7 @@
             reader.readAsArrayBuffer(file);
         }
 
-        // ===== 获取下拉选项 =====
+        // ===== 获取下拉选项（用于datalist） =====
         function getProductBrands() {
             const products = appData.productInfo || [];
             const brands = [...new Set(products.map(p => p.brand).filter(Boolean))];
@@ -1489,6 +1466,62 @@
             return suppliers.map(s => s.name).filter(Boolean);
         }
 
+        // ===== 获取当前页面筛选后的数据（用于表格渲染和导出） =====
+        let repeatFilterMode = false; // 筛重模式开关
+
+        function getFilteredData(dataType) {
+            let data = appData[dataType] || [];
+
+            // 搜索关键词
+            const keyword = document.getElementById('search-input')?.value || '';
+            if (keyword) {
+                data = data.filter(row =>
+                    Object.values(row).some(v => String(v).toLowerCase().includes(keyword.toLowerCase()))
+                );
+            }
+
+            // 零售筛选
+            const isRetail = dataType.includes('retail') || dataType === 'sampleSell';
+            if (isRetail) {
+                const phone = document.getElementById('filter-phone')?.value?.trim() || '';
+                const customer = document.getElementById('filter-customer')?.value?.trim() || '';
+                const brand = document.getElementById('filter-brand')?.value?.trim() || '';
+                const model = document.getElementById('filter-model')?.value?.trim() || ''; // 新增型号筛选
+                const channel = document.getElementById('filter-channel')?.value || '';
+                if (phone) data = data.filter(row => String(row.phone || '').includes(phone));
+                if (customer) data = data.filter(row => String(row.customer || '').toLowerCase().includes(customer
+                    .toLowerCase()));
+                if (brand) data = data.filter(row => String(row.brand || '').toLowerCase().includes(brand.toLowerCase()));
+                if (model) data = data.filter(row => String(row.model || '').toLowerCase().includes(model.toLowerCase()));
+                if (channel) data = data.filter(row => row.channel === channel);
+            }
+
+            // 仓库筛选
+            const whFilter = document.getElementById('warehouse-filter');
+            if (whFilter && whFilter.value && data[0]?.warehouse !== undefined) {
+                data = data.filter(row => row.warehouse === whFilter.value);
+            }
+
+            // 筛重模式（仅零售）
+            if (isRetail && repeatFilterMode) {
+                // 按订单号分组统计
+                const countMap = {};
+                data.forEach(row => {
+                    const key = row.orderNo || '';
+                    if (key) {
+                        countMap[key] = (countMap[key] || 0) + 1;
+                    }
+                });
+                // 只保留出现次数>1的
+                data = data.filter(row => {
+                    const key = row.orderNo || '';
+                    return key && countMap[key] > 1;
+                });
+            }
+
+            return data;
+        }
+
         // ===================================================================
         // 5. 渲染主表格（含零售筛选）
         // ===================================================================
@@ -1499,17 +1532,20 @@
             const isStock = dataType === 'stock';
 
             let filterHtml = '';
+            let extraBtn = '';
             if (isRetail) {
                 filterHtml = `
                     <input type="text" id="filter-phone" placeholder="手机号" oninput="renderTable('${dataType}')">
                     <input type="text" id="filter-customer" placeholder="客户姓名" oninput="renderTable('${dataType}')">
                     <input type="text" id="filter-brand" placeholder="商品品牌" oninput="renderTable('${dataType}')">
+                    <input type="text" id="filter-model" placeholder="商品型号" oninput="renderTable('${dataType}')">
                     <select id="filter-channel" onchange="renderTable('${dataType}')">
                         <option value="">全部渠道</option>
                         <option value="线上">线上</option>
                         <option value="线下">线下</option>
                     </select>
                 `;
+                extraBtn = `<button class="btn btn-warning" onclick="toggleRepeatFilter('${dataType}')" id="repeat-filter-btn">🔍 筛重</button>`;
             }
 
             let html = `
@@ -1525,6 +1561,7 @@
                 <div class="toolbar">
                     <input type="text" placeholder="搜索关键词..." id="search-input" oninput="renderTable('${dataType}')">
                     ${filterHtml}
+                    ${extraBtn}
                     <select id="warehouse-filter" onchange="renderTable('${dataType}')" style="display:${isPurchase||isStock?'inline-block':'none'}">
                         <option value="">全部仓库</option>
                         <option value="新库房">新库房</option>
@@ -1539,6 +1576,18 @@
             `;
 
             area.innerHTML = html;
+            renderTable(dataType);
+        }
+
+        // ===== 切换筛重模式 =====
+        function toggleRepeatFilter(dataType) {
+            repeatFilterMode = !repeatFilterMode;
+            const btn = document.getElementById('repeat-filter-btn');
+            if (btn) {
+                btn.textContent = repeatFilterMode ? '🔍 取消筛重' : '🔍 筛重';
+                btn.classList.toggle('btn-warning');
+                btn.classList.toggle('btn-danger');
+            }
             renderTable(dataType);
         }
 
@@ -1610,35 +1659,8 @@
             const table = document.getElementById('data-table');
             if (!table) return;
             const cols = tableColumns[dataType];
-            let data = appData[dataType] || [];
+            const data = getFilteredData(dataType);
 
-            const keyword = document.getElementById('search-input')?.value || '';
-            if (keyword) {
-                data = data.filter(row =>
-                    Object.values(row).some(v => String(v).toLowerCase().includes(keyword.toLowerCase()))
-                );
-            }
-
-            // 零售筛选
-            const isRetail = dataType.includes('retail') || dataType === 'sampleSell';
-            if (isRetail) {
-                const phone = document.getElementById('filter-phone')?.value?.trim() || '';
-                const customer = document.getElementById('filter-customer')?.value?.trim() || '';
-                const brand = document.getElementById('filter-brand')?.value?.trim() || '';
-                const channel = document.getElementById('filter-channel')?.value || '';
-                if (phone) data = data.filter(row => String(row.phone || '').includes(phone));
-                if (customer) data = data.filter(row => String(row.customer || '').toLowerCase().includes(customer
-                .toLowerCase()));
-                if (brand) data = data.filter(row => String(row.brand || '').toLowerCase().includes(brand.toLowerCase()));
-                if (channel) data = data.filter(row => row.channel === channel);
-            }
-
-            const whFilter = document.getElementById('warehouse-filter');
-            if (whFilter && whFilter.value && data[0]?.warehouse !== undefined) {
-                data = data.filter(row => row.warehouse === whFilter.value);
-            }
-
-            // 对于库存日报，销售订货数字可点击
             const isStock = dataType === 'stock';
 
             let html = '<thead><tr>';
@@ -1649,10 +1671,16 @@
                 html += `<tr><td colspan="${cols.length + 1}" class="empty-tip">暂无数据，请新增或导入</td></tr>`;
             } else {
                 data.forEach((row, idx) => {
+                    // 注意：idx 是过滤后的索引，不能用于删除/编辑原数组，但我们使用 row 的唯一标识？但原代码使用索引，我们需要用实际索引。我们可以在渲染时保存原始索引，但为了兼容，我们使用 appData[dataType] 中的索引，通过 findIndex。
+                    // 由于数据可能被过滤，我们需要找到原始索引。我们先用原始数据查找。
+                    const rawData = appData[dataType] || [];
+                    const realIdx = rawData.indexOf(row);
+                    // 如果找不到，可能数据已被修改，使用 -1 保护
+                    const editIdx = realIdx >= 0 ? realIdx : idx;
+
                     html += '<tr>';
                     cols.forEach(c => {
                         let val = row[c.key] !== undefined && row[c.key] !== null ? row[c.key] : '';
-                        // 库存日报：销售订货可点击
                         if (isStock && c.key === 'salesOrder' && val > 0) {
                             const goodsName = row.goodsName || '';
                             const brand = row.brand || '';
@@ -1662,8 +1690,8 @@
                         html += `<td>${val}</td>`;
                     });
                     html += `<td>
-                        <button class="action-btn edit" onclick="editRow('${dataType}', ${idx})">编辑</button>
-                        <button class="action-btn delete" onclick="deleteRow('${dataType}', ${idx})">删除</button>
+                        <button class="action-btn edit" onclick="editRow('${dataType}', ${editIdx})">编辑</button>
+                        <button class="action-btn delete" onclick="deleteRow('${dataType}', ${editIdx})">删除</button>
                     </td>`;
                     html += '</tr>';
                 });
@@ -1672,7 +1700,7 @@
             table.innerHTML = html;
         }
 
-        // ===== 库存日报点击跳转零售 =====
+        // ===== 库存日报点击跳转零售（增加型号筛选） =====
         function jumpToRetailByProduct(brand, goodsName, model) {
             // 切换到零售订单页面
             showPage('retail-order');
@@ -1680,11 +1708,15 @@
             setTimeout(() => {
                 const brandInput = document.getElementById('filter-brand');
                 const searchInput = document.getElementById('search-input');
+                const modelInput = document.getElementById('filter-model');
                 if (brandInput) {
                     brandInput.value = brand || '';
                 }
                 if (searchInput) {
                     searchInput.value = goodsName || '';
+                }
+                if (modelInput) {
+                    modelInput.value = model || '';
                 }
                 // 触发筛选
                 const dataType = 'retailOrder';
@@ -1702,7 +1734,7 @@
         }
 
         // ===================================================================
-        // 6. 表单构建（含下拉选择 + 手机号自动填充）
+        // 6. 表单构建（含 input+datalist 支持输入过滤）
         // ===================================================================
         function genOrderNo(prefix, dataType) {
             const list = appData[dataType] || [];
@@ -1710,37 +1742,37 @@
             return prefix + num;
         }
 
-        // ---- 构建下拉选项 ----
-        function buildSelectOptions(options, selected) {
-            let html = '<option value="">请选择</option>';
-            options.forEach(opt => {
-                const sel = opt === selected ? 'selected' : '';
-                html += `<option value="${opt}" ${sel}>${opt}</option>`;
-            });
-            return html;
+        // ---- 构建 datalist 选项 ----
+        function buildDatalistOptions(options) {
+            return options.map(opt => `<option value="${opt}">`).join('');
         }
 
         // ---- 采购表单 ----
         function buildPurchaseForm(dataType) {
             const suppliers = getSupplierNames();
             const brands = getProductBrands();
-
+            const brandOpts = buildDatalistOptions(brands);
+            // 名称和型号动态更新，初始为空
             return `
             <div class="form-grid">
                 <div class="form-item"><label>单号</label><input id="f_orderNo" readonly></div>
                 <div class="form-item"><label>供应商</label>
-                    <select id="f_supplier">${buildSelectOptions(suppliers)}</select>
+                    <input list="f_supplier_list" id="f_supplier" placeholder="请输入或选择">
+                    <datalist id="f_supplier_list">${buildDatalistOptions(suppliers)}</datalist>
                 </div>
                 <div class="form-item"><label>采购日期</label><input id="f_purchaseDate" type="date"></div>
                 <div class="form-item"><label>收货日期</label><input id="f_receiveDate" type="date"></div>
                 <div class="form-item"><label>商品品牌</label>
-                    <select id="f_brand" onchange="onBrandChange('purchase')">${buildSelectOptions(brands)}</select>
+                    <input list="f_brand_list" id="f_brand" placeholder="请输入或选择" oninput="onBrandInput('purchase')">
+                    <datalist id="f_brand_list">${brandOpts}</datalist>
                 </div>
                 <div class="form-item"><label>商品名称</label>
-                    <select id="f_goodsName" onchange="onGoodsNameChange('purchase')"><option value="">请选择</option></select>
+                    <input list="f_goodsName_list" id="f_goodsName" placeholder="请输入或选择" oninput="onNameInput('purchase')">
+                    <datalist id="f_goodsName_list"></datalist>
                 </div>
                 <div class="form-item"><label>商品型号</label>
-                    <select id="f_model"><option value="">请选择</option></select>
+                    <input list="f_model_list" id="f_model" placeholder="请输入或选择">
+                    <datalist id="f_model_list"></datalist>
                 </div>
                 <div class="form-item"><label>数量</label><input id="f_quantity" type="number"></div>
                 <div class="form-item"><label>单价</label><input id="f_price" type="number" step="0.01"></div>
@@ -1761,10 +1793,12 @@
             </div>`;
         }
 
-        // ---- 零售表单（含手机号自动填充 + 历史订单） ----
+        // ---- 零售表单 ----
         function buildRetailForm(dataType) {
             const brands = getProductBrands();
             const employees = getEmployeeNames();
+            const brandOpts = buildDatalistOptions(brands);
+            const empOpts = buildDatalistOptions(employees);
 
             return `
             <div class="form-grid">
@@ -1777,19 +1811,23 @@
                     <div class="history-order-list" id="history-order-list"></div>
                 </div>
                 <div class="form-item"><label>销售人员</label>
-                    <select id="f_salesman">${buildSelectOptions(employees)}</select>
+                    <input list="f_salesman_list" id="f_salesman" placeholder="请输入或选择">
+                    <datalist id="f_salesman_list">${empOpts}</datalist>
                 </div>
                 <div class="form-item"><label>销售渠道</label>
                     <select id="f_channel"><option value="">请选择</option><option value="线上">线上</option><option value="线下">线下</option></select>
                 </div>
                 <div class="form-item"><label>商品品牌</label>
-                    <select id="f_brand" onchange="onBrandChange('retail')">${buildSelectOptions(brands)}</select>
+                    <input list="f_brand_list" id="f_brand" placeholder="请输入或选择" oninput="onBrandInput('retail')">
+                    <datalist id="f_brand_list">${brandOpts}</datalist>
                 </div>
                 <div class="form-item"><label>商品名称</label>
-                    <select id="f_goodsName" onchange="onGoodsNameChange('retail')"><option value="">请选择</option></select>
+                    <input list="f_goodsName_list" id="f_goodsName" placeholder="请输入或选择" oninput="onNameInput('retail')">
+                    <datalist id="f_goodsName_list"></datalist>
                 </div>
                 <div class="form-item"><label>商品规格型号</label>
-                    <select id="f_model"><option value="">请选择</option></select>
+                    <input list="f_model_list" id="f_model" placeholder="请输入或选择">
+                    <datalist id="f_model_list"></datalist>
                 </div>
                 <div class="form-item"><label>销售价格</label><input id="f_sellPrice" type="number" step="0.01"></div>
                 <div class="form-item"><label>零售价格</label><input id="f_retailPrice" type="number" step="0.01"></div>
@@ -1847,22 +1885,28 @@
             </div>`;
         }
 
-        // ---- 品牌/名称/型号联动 ----
-        function onBrandChange(type) {
+        // ---- 品牌/名称/型号联动（input 版本） ----
+        function onBrandInput(type) {
             const brandEl = document.getElementById('f_brand');
             const nameEl = document.getElementById('f_goodsName');
             const modelEl = document.getElementById('f_model');
             if (!brandEl || !nameEl || !modelEl) return;
             const brand = brandEl.value;
             const names = getProductNamesByBrand(brand);
-            nameEl.innerHTML = '<option value="">请选择</option>';
-            names.forEach(n => {
-                nameEl.innerHTML += `<option value="${n}">${n}</option>`;
-            });
-            modelEl.innerHTML = '<option value="">请选择</option>';
+            const nameDatalist = document.getElementById('f_goodsName_list');
+            if (nameDatalist) {
+                nameDatalist.innerHTML = buildDatalistOptions(names);
+            }
+            // 清空型号
+            const modelDatalist = document.getElementById('f_model_list');
+            if (modelDatalist) modelDatalist.innerHTML = '';
+            // 如果名称有值，触发名称联动
+            if (nameEl.value) {
+                onNameInput(type);
+            }
         }
 
-        function onGoodsNameChange(type) {
+        function onNameInput(type) {
             const brandEl = document.getElementById('f_brand');
             const nameEl = document.getElementById('f_goodsName');
             const modelEl = document.getElementById('f_model');
@@ -1870,28 +1914,32 @@
             const brand = brandEl.value;
             const name = nameEl.value;
             const models = getProductModelsByBrandName(brand, name);
-            modelEl.innerHTML = '<option value="">请选择</option>';
-            models.forEach(m => {
-                modelEl.innerHTML += `<option value="${m}">${m}</option>`;
-            });
+            const modelDatalist = document.getElementById('f_model_list');
+            if (modelDatalist) {
+                modelDatalist.innerHTML = buildDatalistOptions(models);
+            }
         }
 
         // ---- 样机上样表单 ----
         function buildSampleDisplayForm() {
             const brands = getProductBrands();
+            const brandOpts = buildDatalistOptions(brands);
             return `
             <div class="form-grid">
                 <div class="form-item"><label>单号</label><input id="f_orderNo" readonly></div>
                 <div class="form-item"><label>上样门店地址</label><input id="f_storeAddress"></div>
                 <div class="form-item"><label>上样日期</label><input id="f_displayDate" type="date"></div>
                 <div class="form-item"><label>商品品牌</label>
-                    <select id="f_brand" onchange="onBrandChange('sample')">${buildSelectOptions(brands)}</select>
+                    <input list="f_brand_list" id="f_brand" placeholder="请输入或选择" oninput="onBrandInput('sample')">
+                    <datalist id="f_brand_list">${brandOpts}</datalist>
                 </div>
                 <div class="form-item"><label>商品名称</label>
-                    <select id="f_goodsName" onchange="onGoodsNameChange('sample')"><option value="">请选择</option></select>
+                    <input list="f_goodsName_list" id="f_goodsName" placeholder="请输入或选择" oninput="onNameInput('sample')">
+                    <datalist id="f_goodsName_list"></datalist>
                 </div>
                 <div class="form-item"><label>商品型号</label>
-                    <select id="f_model"><option value="">请选择</option></select>
+                    <input list="f_model_list" id="f_model" placeholder="请输入或选择">
+                    <datalist id="f_model_list"></datalist>
                 </div>
                 <div class="form-item"><label>数量</label><input id="f_quantity" type="number"></div>
                 <div class="form-item"><label>价格</label><input id="f_price" type="number" step="0.01"></div>
@@ -1903,6 +1951,7 @@
         // ---- 样机销售表单 ----
         function buildSampleSellForm() {
             const employees = getEmployeeNames();
+            const empOpts = buildDatalistOptions(employees);
             return `
             <div class="form-grid">
                 <div class="form-item"><label>单号</label><input id="f_orderNo" readonly></div>
@@ -1914,7 +1963,8 @@
                     <div class="history-order-list" id="history-order-list"></div>
                 </div>
                 <div class="form-item"><label>销售人员</label>
-                    <select id="f_salesman">${buildSelectOptions(employees)}</select>
+                    <input list="f_salesman_list" id="f_salesman" placeholder="请输入或选择">
+                    <datalist id="f_salesman_list">${empOpts}</datalist>
                 </div>
                 <div class="form-item"><label>销售渠道</label>
                     <select id="f_channel"><option value="">请选择</option><option value="线上">线上</option><option value="线下">线下</option></select>
@@ -1960,16 +2010,20 @@
         // ---- stock表单 ----
         function buildStockForm() {
             const brands = getProductBrands();
+            const brandOpts = buildDatalistOptions(brands);
             return `
             <div class="form-grid">
                 <div class="form-item"><label>商品品牌</label>
-                    <select id="f_brand" onchange="onBrandChange('stock')">${buildSelectOptions(brands)}</select>
+                    <input list="f_brand_list" id="f_brand" placeholder="请输入或选择" oninput="onBrandInput('stock')">
+                    <datalist id="f_brand_list">${brandOpts}</datalist>
                 </div>
                 <div class="form-item"><label>商品名称</label>
-                    <select id="f_goodsName" onchange="onGoodsNameChange('stock')"><option value="">请选择</option></select>
+                    <input list="f_goodsName_list" id="f_goodsName" placeholder="请输入或选择" oninput="onNameInput('stock')">
+                    <datalist id="f_goodsName_list"></datalist>
                 </div>
                 <div class="form-item"><label>商品型号</label>
-                    <select id="f_model"><option value="">请选择</option></select>
+                    <input list="f_model_list" id="f_model" placeholder="请输入或选择">
+                    <datalist id="f_model_list"></datalist>
                 </div>
                 <div class="form-item"><label>账面库存</label><input id="f_bookStock" type="number"></div>
                 <div class="form-item"><label>销售订货</label><input id="f_salesOrder" type="number"></div>
@@ -2036,8 +2090,16 @@
             Object.keys(row).forEach(key => {
                 const el = document.getElementById('f_' + key);
                 if (el) {
-                    // 如果是select，尝试匹配选项
-                    if (el.tagName === 'SELECT') {
+                    if (el.tagName === 'INPUT' && el.hasAttribute('list')) {
+                        // 对于 input+datalist，直接赋值
+                        el.value = row[key] || '';
+                        // 触发联动更新
+                        if (key === 'brand') {
+                            onBrandInput(dataType);
+                        } else if (key === 'goodsName') {
+                            onNameInput(dataType);
+                        }
+                    } else if (el.tagName === 'SELECT') {
                         const options = el.options;
                         let found = false;
                         for (let i = 0; i < options.length; i++) {
@@ -2048,7 +2110,6 @@
                             }
                         }
                         if (!found) {
-                            // 尝试添加选项
                             el.innerHTML += `<option value="${row[key]}" selected>${row[key]}</option>`;
                         }
                     } else {
@@ -2056,17 +2117,16 @@
                     }
                 }
             });
-            // 触发联动
+            // 额外触发联动（确保名称和型号列表更新）
             const brandEl = document.getElementById('f_brand');
             if (brandEl) {
-                const evt = new Event('change');
+                const evt = new Event('input');
                 brandEl.dispatchEvent(evt);
             }
-            // 重新触发名称联动
             setTimeout(() => {
                 const nameEl = document.getElementById('f_goodsName');
                 if (nameEl) {
-                    const evt = new Event('change');
+                    const evt = new Event('input');
                     nameEl.dispatchEvent(evt);
                 }
             }, 50);
@@ -2250,40 +2310,17 @@
                         // 填充商品品牌
                         const brandEl = document.getElementById('f_brand');
                         if (brandEl && selected.brand) {
-                            const opts = brandEl.options;
-                            let found = false;
-                            for (let i = 0; i < opts.length; i++) {
-                                if (opts[i].value === selected.brand) {
-                                    brandEl.selectedIndex = i;
-                                    found = true;
-                                    break;
-                                }
-                            }
-                            if (!found) {
-                                brandEl.innerHTML += `<option value="${selected.brand}" selected>${selected.brand}</option>`;
-                            }
+                            brandEl.value = selected.brand;
                             // 触发品牌联动
-                            const evt = new Event('change');
+                            const evt = new Event('input');
                             brandEl.dispatchEvent(evt);
                         }
                         // 填充商品名称
                         setTimeout(() => {
                             const nameEl = document.getElementById('f_goodsName');
                             if (nameEl && selected.goodsName) {
-                                const opts = nameEl.options;
-                                let found = false;
-                                for (let i = 0; i < opts.length; i++) {
-                                    if (opts[i].value === selected.goodsName) {
-                                        nameEl.selectedIndex = i;
-                                        found = true;
-                                        break;
-                                    }
-                                }
-                                if (!found) {
-                                    nameEl.innerHTML +=
-                                        `<option value="${selected.goodsName}" selected>${selected.goodsName}</option>`;
-                                }
-                                const evt = new Event('change');
+                                nameEl.value = selected.goodsName;
+                                const evt = new Event('input');
                                 nameEl.dispatchEvent(evt);
                             }
                         }, 100);
@@ -2291,37 +2328,13 @@
                         setTimeout(() => {
                             const modelEl = document.getElementById('f_model');
                             if (modelEl && selected.model) {
-                                const opts = modelEl.options;
-                                let found = false;
-                                for (let i = 0; i < opts.length; i++) {
-                                    if (opts[i].value === selected.model) {
-                                        modelEl.selectedIndex = i;
-                                        found = true;
-                                        break;
-                                    }
-                                }
-                                if (!found) {
-                                    modelEl.innerHTML +=
-                                        `<option value="${selected.model}" selected>${selected.model}</option>`;
-                                }
+                                modelEl.value = selected.model;
                             }
                         }, 200);
                         // 填充销售人员
                         const salesmanEl = document.getElementById('f_salesman');
                         if (salesmanEl && selected.salesman) {
-                            const opts = salesmanEl.options;
-                            let found = false;
-                            for (let i = 0; i < opts.length; i++) {
-                                if (opts[i].value === selected.salesman) {
-                                    salesmanEl.selectedIndex = i;
-                                    found = true;
-                                    break;
-                                }
-                            }
-                            if (!found) {
-                                salesmanEl.innerHTML +=
-                                    `<option value="${selected.salesman}" selected>${selected.salesman}</option>`;
-                            }
+                            salesmanEl.value = selected.salesman;
                         }
 
                         listEl.style.display = 'none';
@@ -2462,7 +2475,7 @@
         }
 
         // ===================================================================
-        // 10. 导出功能（含客户筛选 + 客户总金额）
+        // 10. 导出功能（基于当前筛选）
         // ===================================================================
         function exportExcel(dataType) {
             showExportConfig(dataType);
@@ -2487,17 +2500,8 @@
 
             const isRetail = dataType.includes('retail') || dataType === 'sampleSell';
 
+            // 移除导出筛选行，因为数据已经基于页面筛选
             const modalBody = `
-                ${isRetail ? `
-                <div class="export-filter-row">
-                    <label>筛选客户（电话或姓名）：
-                        <input type="text" id="export-filter-customer" placeholder="输入客户电话或姓名">
-                    </label>
-                    <label style="color:#999;font-size:12px;">
-                        <span id="data-count">共 ${appData[dataType]?.length || 0} 条数据</span>
-                    </label>
-                </div>
-                ` : ''}
                 <div style="margin-bottom:10px;">
                     <span style="font-weight:500;font-size:14px;">选择要导出的字段：</span>
                     <span class="select-all-link" onclick="toggleExportFields(true)">全选</span>
@@ -2527,7 +2531,7 @@
                         按仓库分组汇总
                     </label>
                     <label style="color:#999;font-size:12px;margin-left:auto;">
-                        <span id="data-count-2">共 ${appData[dataType]?.length || 0} 条数据</span>
+                        <span id="data-count">共 ${getFilteredData(dataType).length} 条数据</span>
                     </label>
                 </div>
             `;
@@ -2566,21 +2570,8 @@
 
         function generateExcel(dataType) {
             const cols = tableColumns[dataType];
-            let data = appData[dataType] || [];
-
-            const isRetail = dataType.includes('retail') || dataType === 'sampleSell';
-            const filterInput = document.getElementById('export-filter-customer');
-            let filterKeyword = '';
-            if (filterInput) {
-                filterKeyword = filterInput.value.trim().toLowerCase();
-            }
-            if (isRetail && filterKeyword) {
-                data = data.filter(row => {
-                    const name = (row.customer || '').toLowerCase();
-                    const phone = (row.phone || '').toLowerCase();
-                    return name.includes(filterKeyword) || phone.includes(filterKeyword);
-                });
-            }
+            // 使用当前页面筛选后的数据
+            let data = getFilteredData(dataType);
 
             const selectedKeys = [];
             document.querySelectorAll('.export-field-cb:checked').forEach(cb => {
@@ -2605,7 +2596,9 @@
             const numericCols = selectedCols.filter(c => numericKeys.includes(c.key));
 
             let exportRows = [];
-            let customerTotalMap = {}; // 用于计算每位客户总金额
+            let customerTotalMap = {};
+
+            const isRetail = dataType.includes('retail') || dataType === 'sampleSell';
 
             // ---- 按客户分组汇总（零售专用） ----
             if (isRetail && groupByCustomer && data.length > 0) {
@@ -2614,7 +2607,6 @@
                     const key = row.phone || row.customer || '未指定客户';
                     if (!groups[key]) groups[key] = [];
                     groups[key].push(row);
-                    // 累计客户总金额
                     const amt = parseFloat(row.payAmount) || 0;
                     if (!customerTotalMap[key]) customerTotalMap[key] = 0;
                     customerTotalMap[key] += amt;
@@ -2623,7 +2615,6 @@
                 const sortedKeys = Object.keys(groups).sort();
                 sortedKeys.forEach(customerKey => {
                     const rows = groups[customerKey];
-                    // 客户信息行
                     const titleRow = {};
                     selectedCols.forEach(c => {
                         if (c.key === 'customer') {
@@ -2636,7 +2627,6 @@
                     });
                     exportRows.push(titleRow);
 
-                    // 订单明细
                     rows.forEach(row => {
                         const rowData = {};
                         selectedCols.forEach(c => {
@@ -2646,7 +2636,6 @@
                         exportRows.push(rowData);
                     });
 
-                    // 客户小计
                     const subRow = {};
                     selectedCols.forEach(c => {
                         if (numericCols.some(nc => nc.key === c.key)) {
@@ -2664,9 +2653,7 @@
                             subRow[c.key] = '';
                         }
                     });
-                    // 如果启用客户总金额，在小计行后追加
                     if (showCustomerTotal) {
-                        // 在小计行后面添加一行显示总金额
                         const totalRow = {};
                         selectedCols.forEach(c => {
                             if (c.key === 'customer') {
@@ -2683,13 +2670,11 @@
                         exportRows.push(subRow);
                     }
 
-                    // 空行分隔
                     const emptyRow = {};
                     selectedCols.forEach(c => { emptyRow[c.key] = ''; });
                     exportRows.push(emptyRow);
                 });
 
-                // 总计（所有客户汇总）
                 if (showSummary) {
                     const totalRow = {};
                     selectedCols.forEach(c => {
@@ -2780,7 +2765,6 @@
             }
             // ---- 普通导出 ----
             else {
-                // 如果启用客户总金额，先计算
                 if (isRetail && showCustomerTotal) {
                     data.forEach(row => {
                         const key = row.phone || row.customer || '未指定客户';
@@ -2796,7 +2780,6 @@
                         rowData[c.key] = row[c.key] !== undefined && row[c.key] !== null ? row[c.key] :
                             '';
                     });
-                    // 如果启用客户总金额，在行数据中添加
                     if (isRetail && showCustomerTotal) {
                         const key = row.phone || row.customer || '未指定客户';
                         rowData['_customerTotal'] = customerTotalMap[key]?.toFixed(2) || '0.00';
@@ -2821,7 +2804,6 @@
                     if (selectedCols.length > 0) {
                         totalRow[selectedCols[0].key] = '汇总';
                     }
-                    // 如果启用客户总金额，汇总行也加一列
                     if (isRetail && showCustomerTotal) {
                         totalRow['_customerTotal'] = '';
                     }
@@ -2831,7 +2813,6 @@
 
             // 构建 Excel
             const headerLabels = selectedCols.map(c => c.label);
-            // 如果启用客户总金额，在最后添加一列
             if (isRetail && showCustomerTotal) {
                 headerLabels.push('客户总金额');
             }
@@ -2848,7 +2829,6 @@
                     }
                     return val;
                 });
-                // 如果有客户总金额字段
                 if (isRetail && showCustomerTotal) {
                     rowArr.push(row['_customerTotal'] || '');
                 }
@@ -2909,8 +2889,8 @@
         window.exportExcel = exportExcel;
         window.renderTable = renderTable;
         window.autoFillByPhone = autoFillByPhone;
-        window.onBrandChange = onBrandChange;
-        window.onGoodsNameChange = onGoodsNameChange;
+        window.onBrandInput = onBrandInput;
+        window.onNameInput = onNameInput;
         window.toggleExportFields = toggleExportFields;
         window.updateExportFieldCount = updateExportFieldCount;
         window.generateExcel = generateExcel;
@@ -2925,6 +2905,8 @@
         window.doRegister = doRegister;
         window.importBaseExcel = importBaseExcel;
         window.handleBaseFileImport = handleBaseFileImport;
+        window.toggleRepeatFilter = toggleRepeatFilter;
+        window.getFilteredData = getFilteredData;
     </script>
 </body>
 </html>
