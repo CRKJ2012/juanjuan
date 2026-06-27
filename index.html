@@ -550,6 +550,71 @@
             margin-left: 8px;
         }
 
+        /* 历史订单列表样式 */
+        .history-order-list {
+            margin-top: 6px;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            max-height: 180px;
+            overflow-y: auto;
+            background: #fff;
+            display: none;
+        }
+        .history-order-list .history-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 13px;
+            transition: background 0.15s;
+        }
+        .history-order-list .history-item:hover {
+            background: #f0f0f0;
+        }
+        .history-order-list .history-item:last-child {
+            border-bottom: none;
+        }
+        .history-order-list .history-item .h-label {
+            color: #999;
+            font-size: 12px;
+            margin-right: 6px;
+        }
+        .history-order-list .history-empty {
+            padding: 12px;
+            color: #999;
+            font-size: 13px;
+            text-align: center;
+        }
+
+        /* 导出筛选行 */
+        .export-filter-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 12px 18px;
+            margin-bottom: 12px;
+            padding: 10px 14px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+        .export-filter-row label {
+            font-size: 13px;
+            color: #444;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .export-filter-row input {
+            padding: 5px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+            outline: none;
+            width: 180px;
+        }
+        .export-filter-row input:focus {
+            border-color: #e94560;
+        }
+
         /* 滚动条 */
         ::-webkit-scrollbar {
             width: 6px;
@@ -759,7 +824,6 @@
                 request.onupgradeneeded = (event) => {
                     const db = event.target.result;
                     if (!db.objectStoreNames.contains(STORE_NAME)) {
-                        // 创建一个对象仓库，使用 keyPath 为 'id'
                         db.createObjectStore(STORE_NAME, { keyPath: 'id' });
                     }
                 };
@@ -790,7 +854,6 @@
                 request.onerror = () => reject(request.error);
                 request.onsuccess = () => {
                     if (request.result) {
-                        // 去掉 id 字段，保持数据结构干净
                         const { id, ...data } = request.result;
                         resolve(data);
                     } else {
@@ -807,34 +870,28 @@
                 const raw = localStorage.getItem('gorenje_inventory_data');
                 if (raw) {
                     const oldData = JSON.parse(raw);
-                    // 检查是否已有 IndexedDB 数据，避免覆盖
                     const existing = await loadData();
                     if (!existing || Object.keys(existing).length === 0) {
                         await saveData(oldData);
                         console.log('数据已从 localStorage 迁移到 IndexedDB');
                     }
-                    // 迁移完成后可选择性清除 localStorage 中的旧数据（谨慎）
-                    // localStorage.removeItem('gorenje_inventory_data');
                 }
             } catch (e) {
                 console.warn('迁移 localStorage 数据失败:', e);
             }
         }
 
-        // 全局数据对象（异步加载后会填充）
+        // 全局数据对象
         let appData = getDefaultData();
 
-        // 初始化数据：优先从 IndexedDB 加载，若无则使用默认结构
+        // 初始化数据
         async function initData() {
             try {
-                // 先尝试从 IndexedDB 加载
                 let data = await loadData();
                 if (data && Object.keys(data).length > 0) {
                     appData = data;
                 } else {
-                    // 若 IndexedDB 无数据，尝试从 localStorage 迁移
                     await migrateFromLocalStorage();
-                    // 重新加载
                     data = await loadData();
                     if (data && Object.keys(data).length > 0) {
                         appData = data;
@@ -851,23 +908,20 @@
             return appData;
         }
 
-        // 保存数据（对外接口，自动保存到 IndexedDB）
+        // 保存数据
         async function saveAppData() {
             await saveData(appData);
         }
 
         // ===================================================================
-        // 2. 原有业务逻辑（几乎未改动，仅把同步 localStorage 操作替换为异步 IndexedDB）
+        // 2. 原有业务逻辑
         // ===================================================================
 
-        // 页面加载时，先初始化数据再启动
         let dataReady = false;
 
         window.onload = function() {
-            // 先初始化数据
             initData().then(() => {
                 dataReady = true;
-                // 启动启动页动画
                 setTimeout(() => {
                     document.getElementById('splash-screen').style.opacity = '0';
                     setTimeout(() => {
@@ -878,7 +932,6 @@
                 }, 3000);
             }).catch(err => {
                 console.error('初始化失败:', err);
-                // 降级处理：使用默认数据
                 appData = getDefaultData();
                 dataReady = true;
                 setTimeout(() => {
@@ -893,7 +946,7 @@
         };
 
         // ===================================================================
-        // 3. 登录注册（适配异步数据）
+        // 3. 登录注册
         // ===================================================================
         document.querySelectorAll('.auth-tab').forEach(tab => {
             tab.addEventListener('click', function() {
@@ -994,7 +1047,7 @@
         }
 
         // ===================================================================
-        // 4. 菜单、页面渲染、表格操作（与原代码基本一致，仅 save/load 改为异步）
+        // 4. 菜单、页面渲染、表格操作
         // ===================================================================
         function toggleMenu(el) {
             const wasExpanded = el.classList.contains('expanded');
@@ -1084,11 +1137,14 @@
                 { key: 'invoiceDate', label: '开票日期' }, { key: 'warehouse', label: '归属仓库' },
                 { key: 'remark', label: '备注' }
             ],
+            // ===== 零售订单：新增 brand 字段 =====
             retailOrder: [
                 { key: 'orderNo', label: '单号' }, { key: 'orderSource', label: '订单来源' },
                 { key: 'orderDate', label: '订单日期' }, { key: 'customer', label: '客户姓名' },
                 { key: 'phone', label: '联系电话' }, { key: 'salesman', label: '销售人员' },
-                { key: 'channel', label: '销售渠道' }, { key: 'goodsName', label: '商品名称' },
+                { key: 'channel', label: '销售渠道' },
+                { key: 'brand', label: '商品品牌' }, // 新增
+                { key: 'goodsName', label: '商品名称' },
                 { key: 'model', label: '商品规格型号' }, { key: 'sellPrice', label: '销售价格' },
                 { key: 'retailPrice', label: '零售价格' }, { key: 'discount', label: '折扣' },
                 { key: 'payMethod', label: '收款方式' }, { key: 'payAmount', label: '收款金额' },
@@ -1223,6 +1279,17 @@
             }
 
             bindAutoCalc();
+
+            // ---- 为零售表单绑定手机号自动带出 ----
+            if (isRetail || dataType === 'sampleSell') {
+                const phoneEl = document.getElementById('f_phone');
+                if (phoneEl) {
+                    phoneEl.addEventListener('blur', function() {
+                        autoFillByPhone(dataType);
+                    });
+                    // 也支持输入时触发（但用blur更友好）
+                }
+            }
         }
 
         function editRow(dataType, idx) {
@@ -1237,6 +1304,17 @@
                 <button class="btn btn-default" onclick="closeModal()">取消</button>
                 <button class="btn btn-primary" onclick="updateRow('${dataType}', ${idx})">更新</button>
             `;
+            // 编辑时也绑定手机号自动带出（但编辑时可能不需要，不过保持一致性）
+            const isRetail = dataType.includes('retail') || dataType === 'sampleSell';
+            if (isRetail) {
+                const phoneEl = document.getElementById('f_phone');
+                if (phoneEl) {
+                    phoneEl.removeEventListener('blur', function() {});
+                    phoneEl.addEventListener('blur', function() {
+                        autoFillByPhone(dataType);
+                    });
+                }
+            }
         }
 
         async function saveRow(dataType) {
@@ -1352,6 +1430,7 @@
             </div>`;
         }
 
+        // ===== 零售表单：新增 brand 字段 + 历史订单列表区域 =====
         function buildRetailForm() {
             return `
             <div class="form-grid">
@@ -1359,9 +1438,13 @@
                 <div class="form-item"><label>订单来源</label><input id="f_orderSource"></div>
                 <div class="form-item"><label>订单日期</label><input id="f_orderDate" type="date"></div>
                 <div class="form-item"><label>客户姓名</label><input id="f_customer"></div>
-                <div class="form-item"><label>联系电话</label><input id="f_phone"></div>
+                <div class="form-item"><label>联系电话</label><input id="f_phone" placeholder="输入手机号自动带出历史订单"></div>
+                <div class="form-item" style="grid-column:span 1;position:relative;">
+                    <div class="history-order-list" id="history-order-list"></div>
+                </div>
                 <div class="form-item"><label>销售人员</label><input id="f_salesman"></div>
                 <div class="form-item"><label>销售渠道</label><input id="f_channel"></div>
+                <div class="form-item"><label>商品品牌</label><input id="f_brand"></div>  <!-- 新增 -->
                 <div class="form-item"><label>商品名称</label><input id="f_goodsName"></div>
                 <div class="form-item"><label>商品规格型号</label><input id="f_model"></div>
                 <div class="form-item"><label>销售价格</label><input id="f_sellPrice" type="number" step="0.01"></div>
@@ -1378,9 +1461,10 @@
                 <div class="form-item"><label>收款金额</label><input id="f_payAmount" type="number" step="0.01"></div>
                 <div class="form-item"><label>是否有尾款</label><input id="f_hasBalance" readonly></div>
 
+                <!-- 虚线框：国补数据（导出时不可用） -->
                 <div class="form-item full">
                     <div class="sub-fieldset">
-                        <legend>是否国补</legend>
+                        <legend>国补信息（虚线框内数据无法导出）</legend>
                         <div class="form-grid" style="grid-template-columns: repeat(4,1fr);">
                             <div class="form-item"><label>POS机归属</label>
                                 <select id="f_posOwner"><option value="佳洛顺驰">佳洛顺驰</option><option value="洛高">洛高</option></select>
@@ -1453,7 +1537,83 @@
             </div>`;
         }
 
-        // ==================== 库存自动更新 ====================
+        // ===================================================================
+        // 5. 手机号自动带出历史订单（功能1）
+        // ===================================================================
+        function autoFillByPhone(dataType) {
+            const phoneEl = document.getElementById('f_phone');
+            if (!phoneEl) return;
+            const phone = phoneEl.value.trim();
+            const listEl = document.getElementById('history-order-list');
+            if (!listEl) return;
+
+            if (!phone) {
+                listEl.style.display = 'none';
+                return;
+            }
+
+            // 从所有零售相关数据中查找
+            const retailTypes = ['retailOrder', 'retailSell', 'retailExchange', 'retailReturn'];
+            let historyOrders = [];
+            retailTypes.forEach(type => {
+                const items = appData[type] || [];
+                items.forEach(item => {
+                    if (item.phone && item.phone.trim() === phone) {
+                        historyOrders.push({
+                            type: type,
+                            ...item
+                        });
+                    }
+                });
+            });
+
+            if (historyOrders.length === 0) {
+                listEl.innerHTML = `<div class="history-empty">未找到该手机号的历史订单</div>`;
+                listEl.style.display = 'block';
+                return;
+            }
+
+            // 去重（按订单号去重，避免同一个订单被多次添加）
+            const seen = new Set();
+            const unique = historyOrders.filter(item => {
+                const key = item.orderNo || item.customer + item.address;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            });
+
+            let html = '';
+            unique.forEach((item, idx) => {
+                const label = `${item.orderNo || '无单号'} | ${item.customer || '无姓名'} | ${item.address || '无地址'}`;
+                html += `<div class="history-item" data-idx="${idx}">
+                    <span class="h-label">📋</span> ${label}
+                </div>`;
+            });
+            listEl.innerHTML = html;
+            listEl.style.display = 'block';
+
+            // 绑定点击事件
+            listEl.querySelectorAll('.history-item').forEach(el => {
+                el.addEventListener('click', function() {
+                    const idx = parseInt(this.dataset.idx);
+                    const selected = unique[idx];
+                    if (selected) {
+                        // 填充客户姓名和安装地址
+                        const customerEl = document.getElementById('f_customer');
+                        const addressEl = document.getElementById('f_address');
+                        if (customerEl) customerEl.value = selected.customer || '';
+                        if (addressEl) addressEl.value = selected.address || '';
+                        // 可选：填充销售人员、销售渠道（但用户说只带出订单信息，这里只填姓名和地址）
+                        // 也可以填充品牌，但用户没要求，保持简洁
+                        listEl.style.display = 'none';
+                    }
+                });
+            });
+        }
+
+        // ===================================================================
+        // 6. 库存自动更新
+        // ===================================================================
         async function updateStock() {
             const stockMap = {};
 
@@ -1519,7 +1679,9 @@
             await saveAppData();
         }
 
-        // ==================== Excel 导入 ====================
+        // ===================================================================
+        // 7. Excel 导入
+        // ===================================================================
         function importExcel(dataType) {
             document.getElementById('file-import').click();
         }
@@ -1580,7 +1742,9 @@
             event.target.value = '';
         }
 
-        // ==================== 导出功能（含配置+汇总） ====================
+        // ===================================================================
+        // 8. 导出功能（含客户筛选 + 按客户汇总）
+        // ===================================================================
         function exportExcel(dataType) {
             showExportConfig(dataType);
         }
@@ -1602,7 +1766,21 @@
                 `;
             });
 
+            // 判断是否为零售相关（支持客户筛选）
+            const isRetail = dataType.includes('retail') || dataType === 'sampleSell';
+
             const modalBody = `
+                <!-- 筛选行：客户电话/姓名 -->
+                ${isRetail ? `
+                <div class="export-filter-row">
+                    <label>筛选客户（电话或姓名）：
+                        <input type="text" id="export-filter-customer" placeholder="输入客户电话或姓名">
+                    </label>
+                    <label style="color:#999;font-size:12px;">
+                        <span id="data-count">共 ${appData[dataType]?.length || 0} 条数据</span>
+                    </label>
+                </div>
+                ` : ''}
                 <div style="margin-bottom:10px;">
                     <span style="font-weight:500;font-size:14px;">选择要导出的字段：</span>
                     <span class="select-all-link" onclick="toggleExportFields(true)">全选</span>
@@ -1617,12 +1795,18 @@
                         <input type="checkbox" id="export-summary" checked>
                         显示汇总行（价格汇总）
                     </label>
+                    ${isRetail ? `
+                    <label>
+                        <input type="checkbox" id="export-group-by-customer" checked>
+                        按客户（户数）汇总金额
+                    </label>
+                    ` : ''}
                     <label>
                         <input type="checkbox" id="export-filter-warehouse" ${dataType.includes('purchase')||dataType==='stock'?'checked':''} ${dataType.includes('purchase')||dataType==='stock'?'':'disabled'}>
                         按仓库分组汇总
                     </label>
                     <label style="color:#999;font-size:12px;margin-left:auto;">
-                        <span id="data-count">共 ${appData[dataType]?.length || 0} 条数据</span>
+                        <span id="data-count-2">共 ${appData[dataType]?.length || 0} 条数据</span>
                     </label>
                 </div>
             `;
@@ -1661,7 +1845,22 @@
 
         function generateExcel(dataType) {
             const cols = tableColumns[dataType];
-            const data = appData[dataType] || [];
+            let data = appData[dataType] || [];
+
+            // ---- 客户筛选（仅零售相关） ----
+            const isRetail = dataType.includes('retail') || dataType === 'sampleSell';
+            const filterInput = document.getElementById('export-filter-customer');
+            let filterKeyword = '';
+            if (filterInput) {
+                filterKeyword = filterInput.value.trim().toLowerCase();
+            }
+            if (isRetail && filterKeyword) {
+                data = data.filter(row => {
+                    const name = (row.customer || '').toLowerCase();
+                    const phone = (row.phone || '').toLowerCase();
+                    return name.includes(filterKeyword) || phone.includes(filterKeyword);
+                });
+            }
 
             const selectedKeys = [];
             document.querySelectorAll('.export-field-cb:checked').forEach(cb => {
@@ -1675,6 +1874,7 @@
 
             const showSummary = document.getElementById('export-summary')?.checked || false;
             const groupByWarehouse = document.getElementById('export-filter-warehouse')?.checked || false;
+            const groupByCustomer = document.getElementById('export-group-by-customer')?.checked || false;
 
             const selectedCols = cols.filter(c => selectedKeys.includes(c.key));
 
@@ -1685,7 +1885,92 @@
 
             let exportRows = [];
 
-            if (groupByWarehouse && (dataType.includes('purchase') || dataType === 'stock')) {
+            // ---- 按客户分组汇总（零售专用） ----
+            if (isRetail && groupByCustomer && data.length > 0) {
+                // 按客户分组（使用 phone 作为主键，如果没有 phone 则用 customer）
+                const groups = {};
+                data.forEach(row => {
+                    const key = row.phone || row.customer || '未指定客户';
+                    if (!groups[key]) groups[key] = [];
+                    groups[key].push(row);
+                });
+
+                const sortedKeys = Object.keys(groups).sort();
+                sortedKeys.forEach(customerKey => {
+                    const rows = groups[customerKey];
+                    // 显示客户信息行
+                    const titleRow = {};
+                    selectedCols.forEach(c => {
+                        if (c.key === 'customer') {
+                            titleRow[c.key] = `【${customerKey}】`;
+                        } else if (c.key === 'phone') {
+                            titleRow[c.key] = `电话: ${customerKey}`;
+                        } else {
+                            titleRow[c.key] = '';
+                        }
+                    });
+                    exportRows.push(titleRow);
+
+                    // 订单明细
+                    rows.forEach(row => {
+                        const rowData = {};
+                        selectedCols.forEach(c => {
+                            rowData[c.key] = row[c.key] !== undefined && row[c.key] !== null ?
+                                row[c.key] : '';
+                        });
+                        exportRows.push(rowData);
+                    });
+
+                    // 客户小计
+                    const subRow = {};
+                    selectedCols.forEach(c => {
+                        if (numericCols.some(nc => nc.key === c.key)) {
+                            let sum = 0;
+                            rows.forEach(r => {
+                                const val = parseFloat(r[c.key]);
+                                if (!isNaN(val)) sum += val;
+                            });
+                            subRow[c.key] = sum.toFixed(2);
+                        } else if (c.key === 'customer') {
+                            subRow[c.key] = `小计 (${customerKey})`;
+                        } else if (c.key === 'phone') {
+                            subRow[c.key] = '';
+                        } else {
+                            subRow[c.key] = '';
+                        }
+                    });
+                    exportRows.push(subRow);
+
+                    // 空行分隔
+                    const emptyRow = {};
+                    selectedCols.forEach(c => { emptyRow[c.key] = ''; });
+                    exportRows.push(emptyRow);
+                });
+
+                // 总计（所有客户汇总）
+                if (showSummary) {
+                    const totalRow = {};
+                    selectedCols.forEach(c => {
+                        if (numericCols.some(nc => nc.key === c.key)) {
+                            let sum = 0;
+                            data.forEach(r => {
+                                const val = parseFloat(r[c.key]);
+                                if (!isNaN(val)) sum += val;
+                            });
+                            totalRow[c.key] = sum.toFixed(2);
+                        } else if (c.key === 'customer') {
+                            totalRow[c.key] = '总计（所有客户）';
+                        } else if (c.key === 'phone') {
+                            totalRow[c.key] = '';
+                        } else {
+                            totalRow[c.key] = '';
+                        }
+                    });
+                    exportRows.push(totalRow);
+                }
+            }
+            // ---- 按仓库分组（采购/库存） ----
+            else if (groupByWarehouse && (dataType.includes('purchase') || dataType === 'stock')) {
                 const groups = {};
                 data.forEach(row => {
                     const wh = row.warehouse || '未指定';
@@ -1750,7 +2035,9 @@
                     });
                     exportRows.push(totalRow);
                 }
-            } else {
+            }
+            // ---- 普通导出 ----
+            else {
                 data.forEach(row => {
                     const rowData = {};
                     selectedCols.forEach(c => {
@@ -1781,6 +2068,7 @@
                 }
             }
 
+            // 构建 Excel
             const excelData = [];
             const header = selectedCols.map(c => c.label);
             excelData.push(header);
@@ -1822,17 +2110,14 @@
             closeModal();
         }
 
-        // ==================== 页面就绪 ====================
-        // 页面加载完成后，调用 updateStock 更新库存
-        // 但需要等待数据初始化完成，由 window.onload 处理
-        // 在 dataReady 后执行
+        // ===================================================================
+        // 9. 页面就绪后更新库存
+        // ===================================================================
         (function() {
-            // 检查数据是否已加载，若未加载则等待
             const checkAndUpdate = setInterval(async () => {
                 if (dataReady) {
                     clearInterval(checkAndUpdate);
                     await updateStock();
-                    // 如果当前显示的是库存页，刷新表格
                     if (currentPage === 'stock-daily') {
                         renderTable('stock');
                     }
