@@ -2478,10 +2478,27 @@
         }
 
         // ===================================================================
-        // 9. Excel 导入
+        // 9. Excel 导入（含日期转换修复）
         // ===================================================================
         function importExcel(dataType) {
             document.getElementById('file-import').click();
+        }
+
+        // 工具函数：将Excel日期序列号转换为 YYYY-MM-DD
+        function excelSerialToDate(serial) {
+            if (typeof serial !== 'number' || serial < 0 || serial > 60000) return serial;
+            // Excel日期序列号从1900-01-01开始，但Excel有bug把1900年当作闰年
+            // 对于>=61的日期，需要减1天修正
+            let days = serial;
+            if (serial >= 61) {
+                days = serial - 1;
+            }
+            const epoch = new Date(1899, 11, 30);
+            const date = new Date(epoch.getTime() + days * 86400000);
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
         }
 
         async function handleFileImport(dataType) {
@@ -2498,11 +2515,46 @@
                 const colMap = {};
                 tableColumns[dataType]?.forEach(c => colMap[c.label] = c.key);
 
+                // 获取当前dataType的日期字段列表
+                let dateFields = [];
+                if (dataType === 'purchaseIn' || dataType === 'purchaseExchange' || dataType === 'purchaseReturn') {
+                    dateFields = ['purchaseDate', 'receiveDate', 'invoiceDate'];
+                } else if (dataType === 'retailOrder' || dataType === 'retailSell' || dataType === 'retailExchange' ||
+                    dataType === 'retailReturn') {
+                    dateFields = ['orderDate', 'installDate', 'salesRecordDate', 'invoiceDate', 'posDate'];
+                } else if (dataType === 'sampleDisplay') {
+                    dateFields = ['displayDate'];
+                } else if (dataType === 'sampleSell') {
+                    dateFields = ['orderDate', 'installDate', 'salesRecordDate', 'invoiceDate'];
+                } else {
+                    dateFields = [];
+                }
+
                 let imported = 0;
                 json.forEach(row => {
                     const mapped = {};
                     Object.keys(row).forEach(k => {
                         if (colMap[k]) mapped[colMap[k]] = row[k];
+                    });
+
+                    // === 日期转换：处理Excel日期序列号 ===
+                    dateFields.forEach(field => {
+                        if (mapped[field] !== undefined && mapped[field] !== null && mapped[field] !==
+                            '') {
+                            const val = mapped[field];
+                            // 如果是数字，认为是Excel日期序列号
+                            if (typeof val === 'number') {
+                                mapped[field] = excelSerialToDate(val);
+                            }
+                            // 如果已经是字符串格式（如"2026-06-27"），保持不变
+                            // 如果字符串是纯数字（如"46000"），也转换
+                            if (typeof val === 'string' && /^\d+$/.test(val.trim())) {
+                                const num = parseInt(val.trim());
+                                if (num > 0 && num < 60000) {
+                                    mapped[field] = excelSerialToDate(num);
+                                }
+                            }
+                        }
                     });
 
                     if (!mapped.orderNo) {
