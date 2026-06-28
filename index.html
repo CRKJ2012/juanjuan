@@ -1532,7 +1532,7 @@
         }
 
         // ===================================================================
-        // 5. 数据看板（毛利 = 零售金额 - 进货成本）
+        // 5. 数据看板（毛利 = 销售金额 - 进货成本）
         // ===================================================================
         function renderDashboard() {
             const area = document.getElementById('content-area');
@@ -1601,7 +1601,7 @@
             updateDashboardCards();
         }
 
-        // ---- 核心：更新看板卡片（毛利 = 零售金额 - 进货成本） ----
+        // ---- 核心：更新看板卡片（毛利 = 销售金额 - 进货成本） ----
         function updateDashboardCards() {
             const start = document.getElementById('dashboard-start')?.value || '';
             const end = document.getElementById('dashboard-end')?.value || '';
@@ -1641,10 +1641,9 @@
                 totalPosAmount = 0,
                 totalSubsidy = 0;
             let totalCostPrice = 0; // 销售单的进货总成本
-            let salesRetailTotal = 0; // 销售单的零售总金额
+            let totalSalesAmount = 0; // 销售单的销售总金额
             let totalRetailPrice = 0; // 所有订单的零售价总和（用于卡片展示）
             let totalProfit = 0;
-            let totalProfitFromRetail = 0; // 毛利 = 零售金额 - 成本
 
             // 遍历计算
             filtered.forEach(item => {
@@ -1655,37 +1654,26 @@
                 const retail = parseFloat(item.retailPrice) || 0;
                 const cost = parseFloat(item.costPrice) || 0;
 
-                // 只对销售单（零售订单 + 零售开单）累加成本和零售价
+                // 只对销售单（零售订单 + 零售开单）累加成本和销售金额
                 if (item._type === 'retailOrder' || item._type === 'retailSell') {
                     totalCostPrice += cost;
-                    salesRetailTotal += retail;
+                    totalSalesAmount += sell;
                 }
 
                 // 所有订单累加零售价（用于展示）
                 totalRetailPrice += retail;
-
-                // 利润计算（保留原有逐笔利润字段，但不再用于总利润，总利润使用零售-成本）
-                let profit = parseFloat(item.profit) || 0;
-                if (profit === 0 && sell > 0 && cost > 0) {
-                    profit = sell - cost;
-                }
-                if (profit === 0 && sell > 0 && cost > 0) {
-                    profit = sell - cost;
-                }
-                // 保留 profit 变量但不累加到 totalProfit，因为我们将重新计算
 
                 totalPayAmount += pay;
                 totalSellAmount += sell;
                 if (sell > pay) totalDebt += (sell - pay);
                 totalPosAmount += pos;
                 totalSubsidy += subsidy;
-                // 注意：这里不再累加 profit，而是用新的总利润
             });
 
-            // 总利润 = 销售单零售总额 - 销售单成本总额
-            totalProfit = salesRetailTotal - totalCostPrice;
+            // 总利润 = 销售总金额 - 销售总成本
+            totalProfit = totalSalesAmount - totalCostPrice;
 
-            // 毛利率 = 总利润 / 总销售金额 * 100（保持原有口径）
+            // 毛利率 = 总利润 / 总销售金额 * 100
             let grossMarginRate = 0;
             if (totalSellAmount > 0) {
                 grossMarginRate = (totalProfit / totalSellAmount) * 100;
@@ -1750,7 +1738,7 @@
                 { label: '欠款金额', value: totalDebt, icon: '📉', color: 'card-color-6', format: 'currency' },
                 { label: 'POS机交易金额', value: totalPosAmount, icon: '💳', color: 'card-color-7', format: 'currency' },
                 { label: '国补金额', value: totalSubsidy, icon: '🎯', color: 'card-color-8', format: 'currency' },
-                // ★ 毛利金额（零售金额 - 进货成本）
+                // ★ 毛利金额（销售金额 - 进货成本）
                 { label: '毛利金额', value: totalProfit, icon: '📈', color: 'card-color-9', format: 'currency' },
                 { label: '毛利率', value: grossMarginRate, icon: '📊', color: 'card-color-12', format: 'percent' },
                 { label: '入库金额（净）', value: netPurchaseAmount, icon: '🏢', color: 'card-color-10', format: 'currency' }
@@ -1821,7 +1809,7 @@
                 totalPosAmount = 0,
                 totalSubsidy = 0;
             let totalCostPrice = 0;
-            let salesRetailTotal = 0;
+            let totalSalesAmount = 0;
             let totalRetailPrice = 0;
             let totalProfit = 0;
 
@@ -1835,7 +1823,7 @@
 
                 if (item._type === 'retailOrder' || item._type === 'retailSell') {
                     totalCostPrice += cost;
-                    salesRetailTotal += retail;
+                    totalSalesAmount += sell;
                 }
                 totalRetailPrice += retail;
 
@@ -1845,7 +1833,7 @@
                 totalPosAmount += pos;
                 totalSubsidy += subsidy;
             });
-            totalProfit = salesRetailTotal - totalCostPrice;
+            totalProfit = totalSalesAmount - totalCostPrice;
 
             let grossMarginRate = 0;
             if (totalSellAmount > 0) {
@@ -1910,7 +1898,7 @@
                 ['欠款金额', totalDebt],
                 ['POS机交易金额', totalPosAmount],
                 ['国补金额', totalSubsidy],
-                ['毛利金额（零售-成本）', totalProfit],
+                ['毛利金额（销售-成本）', totalProfit],
                 ['毛利率', grossMarginRate.toFixed(2) + '%'],
                 ['入库金额（净）', netPurchaseAmount],
                 ['', ''],
