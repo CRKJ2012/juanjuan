@@ -1532,7 +1532,7 @@
         }
 
         // ===================================================================
-        // 5. 数据看板（新增：进货总成本、导出Excel、修复毛利）
+        // 5. 数据看板（毛利 = 零售金额 - 进货成本）
         // ===================================================================
         function renderDashboard() {
             const area = document.getElementById('content-area');
@@ -1548,7 +1548,6 @@
                 brandOptions += `<option value="${b}">${b}</option>`;
             });
 
-            // 新增导出按钮
             let html = `
             <div class="content-header">
                 <div class="page-title">📊 数据看板</div>
@@ -1602,7 +1601,7 @@
             updateDashboardCards();
         }
 
-        // ---- 核心：更新看板卡片（新增进货总成本 + 修复毛利） ----
+        // ---- 核心：更新看板卡片（毛利 = 零售金额 - 进货成本） ----
         function updateDashboardCards() {
             const start = document.getElementById('dashboard-start')?.value || '';
             const end = document.getElementById('dashboard-end')?.value || '';
@@ -1641,9 +1640,11 @@
                 totalDebt = 0,
                 totalPosAmount = 0,
                 totalSubsidy = 0;
-            let totalCostPrice = 0; // 新增：进货总成本
+            let totalCostPrice = 0; // 销售单的进货总成本
+            let salesRetailTotal = 0; // 销售单的零售总金额
+            let totalRetailPrice = 0; // 所有订单的零售价总和（用于卡片展示）
             let totalProfit = 0;
-            let totalRetailPrice = 0;
+            let totalProfitFromRetail = 0; // 毛利 = 零售金额 - 成本
 
             // 遍历计算
             filtered.forEach(item => {
@@ -1654,31 +1655,37 @@
                 const retail = parseFloat(item.retailPrice) || 0;
                 const cost = parseFloat(item.costPrice) || 0;
 
-                // 进货总成本只统计销售单（零售订单 + 零售开单）
+                // 只对销售单（零售订单 + 零售开单）累加成本和零售价
                 if (item._type === 'retailOrder' || item._type === 'retailSell') {
                     totalCostPrice += cost;
+                    salesRetailTotal += retail;
                 }
 
-                // 利润计算：优先使用 profit 字段，否则实时计算
+                // 所有订单累加零售价（用于展示）
+                totalRetailPrice += retail;
+
+                // 利润计算（保留原有逐笔利润字段，但不再用于总利润，总利润使用零售-成本）
                 let profit = parseFloat(item.profit) || 0;
                 if (profit === 0 && sell > 0 && cost > 0) {
                     profit = sell - cost;
                 }
-                // 如果 profit 仍然为0但 sell 和 cost 存在，则计算
                 if (profit === 0 && sell > 0 && cost > 0) {
                     profit = sell - cost;
                 }
+                // 保留 profit 变量但不累加到 totalProfit，因为我们将重新计算
 
                 totalPayAmount += pay;
                 totalSellAmount += sell;
                 if (sell > pay) totalDebt += (sell - pay);
                 totalPosAmount += pos;
                 totalSubsidy += subsidy;
-                totalProfit += profit;
-                totalRetailPrice += retail;
+                // 注意：这里不再累加 profit，而是用新的总利润
             });
 
-            // 毛利率 = 总利润 / 总销售金额 * 100
+            // 总利润 = 销售单零售总额 - 销售单成本总额
+            totalProfit = salesRetailTotal - totalCostPrice;
+
+            // 毛利率 = 总利润 / 总销售金额 * 100（保持原有口径）
             let grossMarginRate = 0;
             if (totalSellAmount > 0) {
                 grossMarginRate = (totalProfit / totalSellAmount) * 100;
@@ -1731,7 +1738,7 @@
                 return '¥' + val.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
             };
 
-            // 卡片定义（共13张，新增"进货总成本"）
+            // 卡片定义（共13张）
             const cards = [
                 { label: '总订单数', value: totalOrders, icon: '📋', color: 'card-color-1', format: 'number' },
                 { label: '销售单数', value: salesOrders, icon: '🛒', color: 'card-color-3', format: 'number' },
@@ -1739,14 +1746,12 @@
                 { label: '收款金额', value: totalPayAmount, icon: '💰', color: 'card-color-4', format: 'currency' },
                 { label: '销售金额', value: totalSellAmount, icon: '💵', color: 'card-color-5', format: 'currency' },
                 { label: '零售金额', value: totalRetailPrice, icon: '🏷️', color: 'card-color-11', format: 'currency' },
-                // ★ 新增：进货总成本
                 { label: '进货总成本', value: totalCostPrice, icon: '📦', color: 'card-color-13', format: 'currency' },
                 { label: '欠款金额', value: totalDebt, icon: '📉', color: 'card-color-6', format: 'currency' },
                 { label: 'POS机交易金额', value: totalPosAmount, icon: '💳', color: 'card-color-7', format: 'currency' },
                 { label: '国补金额', value: totalSubsidy, icon: '🎯', color: 'card-color-8', format: 'currency' },
-                // ★ 毛利金额（使用修复后的 totalProfit）
+                // ★ 毛利金额（零售金额 - 进货成本）
                 { label: '毛利金额', value: totalProfit, icon: '📈', color: 'card-color-9', format: 'currency' },
-                // ★ 毛利率（使用修复后的 grossMarginRate）
                 { label: '毛利率', value: grossMarginRate, icon: '📊', color: 'card-color-12', format: 'percent' },
                 { label: '入库金额（净）', value: netPurchaseAmount, icon: '🏢', color: 'card-color-10', format: 'currency' }
             ];
@@ -1776,7 +1781,7 @@
         }
 
         // ===================================================================
-        // 5b. 数据看板导出Excel（新增功能）
+        // 5b. 数据看板导出Excel（同步修改毛利计算）
         // ===================================================================
         function exportDashboardExcel() {
             const start = document.getElementById('dashboard-start')?.value || '';
@@ -1816,8 +1821,9 @@
                 totalPosAmount = 0,
                 totalSubsidy = 0;
             let totalCostPrice = 0;
-            let totalProfit = 0;
+            let salesRetailTotal = 0;
             let totalRetailPrice = 0;
+            let totalProfit = 0;
 
             filtered.forEach(item => {
                 const pay = parseFloat(item.payAmount) || 0;
@@ -1829,24 +1835,17 @@
 
                 if (item._type === 'retailOrder' || item._type === 'retailSell') {
                     totalCostPrice += cost;
+                    salesRetailTotal += retail;
                 }
-
-                let profit = parseFloat(item.profit) || 0;
-                if (profit === 0 && sell > 0 && cost > 0) {
-                    profit = sell - cost;
-                }
-                if (profit === 0 && sell > 0 && cost > 0) {
-                    profit = sell - cost;
-                }
+                totalRetailPrice += retail;
 
                 totalPayAmount += pay;
                 totalSellAmount += sell;
                 if (sell > pay) totalDebt += (sell - pay);
                 totalPosAmount += pos;
                 totalSubsidy += subsidy;
-                totalProfit += profit;
-                totalRetailPrice += retail;
             });
+            totalProfit = salesRetailTotal - totalCostPrice;
 
             let grossMarginRate = 0;
             if (totalSellAmount > 0) {
@@ -1911,7 +1910,7 @@
                 ['欠款金额', totalDebt],
                 ['POS机交易金额', totalPosAmount],
                 ['国补金额', totalSubsidy],
-                ['毛利金额', totalProfit],
+                ['毛利金额（零售-成本）', totalProfit],
                 ['毛利率', grossMarginRate.toFixed(2) + '%'],
                 ['入库金额（净）', netPurchaseAmount],
                 ['', ''],
@@ -1927,7 +1926,6 @@
 
             // Sheet2: 订单明细
             if (filtered.length > 0) {
-                // 定义零售订单的列
                 const retailCols = [
                     { key: '_type', label: '订单类型' },
                     { key: 'orderNo', label: '单号' },
@@ -1943,7 +1941,7 @@
                     { key: 'sellPrice', label: '销售价格' },
                     { key: 'retailPrice', label: '零售价格' },
                     { key: 'costPrice', label: '进货价' },
-                    { key: 'profit', label: '利润' },
+                    { key: 'profit', label: '利润（销售-成本）' },
                     { key: 'discount', label: '折扣' },
                     { key: 'payMethod', label: '收款方式' },
                     { key: 'payAmount', label: '收款金额' },
@@ -1984,7 +1982,6 @@
                 XLSX.utils.book_append_sheet(wb, ws2, '订单明细');
             }
 
-            // 导出文件
             const fileName = `数据看板_${new Date().toISOString().slice(0,10)}.xlsx`;
             XLSX.writeFile(wb, fileName);
         }
@@ -4327,7 +4324,6 @@
         window.exportUserLogs = exportUserLogs;
         window.exportUserData = exportUserData;
         window.importUserData = importUserData;
-        // 新增看板导出
         window.exportDashboardExcel = exportDashboardExcel;
     </script>
 </body>
