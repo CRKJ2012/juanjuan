@@ -1,0 +1,4186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>灿然科技管理系统 v2.0.1</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js">
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.7/dist/umd/supabase.min.js">
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
+
+        /* ========== 启动页 ========== */
+        #splash-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.8s ease;
+        }
+        .splash-logo {
+            font-size: 72px;
+            font-weight: 300;
+            color: #fff;
+            letter-spacing: 15px;
+            opacity: 0;
+            transform: translateY(30px);
+            animation: logoFadeIn 2s ease forwards;
+        }
+        .splash-line {
+            width: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #e94560, transparent);
+            margin-top: 20px;
+            animation: lineExpand 1.5s ease 0.8s forwards;
+        }
+        .splash-copyright {
+            position: absolute;
+            bottom: 30px;
+            color: #666;
+            font-size: 12px;
+            opacity: 0;
+            animation: fadeIn 1s ease 2s forwards;
+        }
+        @keyframes logoFadeIn {
+            0% { opacity: 0; transform: translateY(30px) scale(0.9); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes lineExpand {
+            0% { width: 0; }
+            100% { width: 300px; }
+        }
+        @keyframes fadeIn { to { opacity: 1; } }
+
+        /* ========== 登录注册页 ========== */
+        #auth-screen {
+            display: none;
+            width: 100%;
+            height: 100vh;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            align-items: center;
+            justify-content: center;
+        }
+        .auth-box {
+            width: 420px;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 40px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .auth-title {
+            color: #fff;
+            font-size: 22px;
+            text-align: center;
+            margin-bottom: 30px;
+            letter-spacing: 2px;
+            line-height: 1.6;
+        }
+        .auth-title small {
+            display: block;
+            font-size: 13px;
+            color: #888;
+            letter-spacing: 1px;
+            margin-top: 4px;
+        }
+        .auth-tabs {
+            display: flex;
+            margin-bottom: 25px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .auth-tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            color: #888;
+            cursor: pointer;
+            transition: all 0.3s;
+            border-bottom: 2px solid transparent;
+        }
+        .auth-tab.active {
+            color: #e94560;
+            border-bottom-color: #e94560;
+        }
+        .form-group {
+            margin-bottom: 18px;
+        }
+        .form-group label {
+            display: block;
+            color: #aaa;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 12px 15px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            color: #fff;
+            font-size: 14px;
+            outline: none;
+            transition: border 0.3s;
+        }
+        .form-group input:focus {
+            border-color: #e94560;
+        }
+        .form-group input::placeholder {
+            color: #555;
+        }
+        .remember-box {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .remember-box input {
+            margin-right: 8px;
+        }
+        .remember-box label {
+            color: #aaa;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .auth-btn {
+            width: 100%;
+            padding: 12px;
+            background: #e94560;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-size: 15px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .auth-btn:hover {
+            background: #d63850;
+        }
+        .auth-tip {
+            color: #e94560;
+            font-size: 12px;
+            margin-top: 8px;
+            display: none;
+        }
+        .auth-tip.success {
+            color: #27ae60;
+        }
+
+        /* ========== 主系统 ========== */
+        #main-system {
+            display: none;
+            width: 100%;
+            height: 100vh;
+        }
+        .sidebar {
+            width: 220px;
+            height: 100%;
+            background: #1a1a2e;
+            float: left;
+            overflow-y: auto;
+            padding: 20px 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .sidebar-top {
+            flex: 1;
+        }
+        .sidebar-bottom {
+            padding: 0 15px 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            padding-top: 15px;
+        }
+        .sidebar-logo {
+            color: #fff;
+            font-size: 20px;
+            text-align: center;
+            letter-spacing: 5px;
+            padding: 10px 0 25px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 15px;
+        }
+        .menu-group {
+            margin-bottom: 5px;
+        }
+        .menu-title {
+            padding: 14px 20px;
+            color: #ccc;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 15px;
+            transition: all 0.2s;
+        }
+        .menu-title:hover {
+            background: rgba(233, 69, 96, 0.1);
+            color: #fff;
+        }
+        .menu-title.active {
+            background: rgba(233, 69, 96, 0.15);
+            color: #e94560;
+        }
+        .menu-arrow {
+            transition: transform 0.3s;
+            font-size: 12px;
+        }
+        .menu-title.expanded .menu-arrow {
+            transform: rotate(180deg);
+        }
+        .submenu {
+            display: none;
+            background: rgba(0, 0, 0, 0.2);
+        }
+        .submenu.open {
+            display: block;
+        }
+        .submenu-item {
+            padding: 12px 20px 12px 40px;
+            color: #999;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .submenu-item:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .submenu-item.active {
+            color: #e94560;
+            background: rgba(233, 69, 96, 0.1);
+            border-left: 3px solid #e94560;
+        }
+        .menu-user {
+            padding: 14px 20px;
+            color: #ccc;
+            cursor: pointer;
+            font-size: 15px;
+            transition: all 0.2s;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            margin-top: 10px;
+        }
+        .menu-user:hover {
+            background: rgba(233, 69, 96, 0.1);
+            color: #fff;
+        }
+        .menu-user.active {
+            color: #e94560;
+            background: rgba(233, 69, 96, 0.15);
+        }
+        .version-info {
+            color: #666;
+            font-size: 12px;
+            font-family: "楷体", KaiTi, serif;
+            text-align: center;
+            padding: 10px 0 5px;
+            letter-spacing: 1px;
+            line-height: 1.6;
+        }
+
+        .main-content {
+            margin-left: 220px;
+            height: 100%;
+            background: #f5f6fa;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        .content-header {
+            background: #fff;
+            padding: 18px 25px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        .page-title {
+            font-size: 18px;
+            color: #333;
+            font-weight: 500;
+        }
+        .header-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: #e94560;
+            color: #fff;
+        }
+        .btn-primary:hover {
+            background: #d63850;
+        }
+        .btn-success {
+            background: #27ae60;
+            color: #fff;
+        }
+        .btn-success:hover {
+            background: #219a52;
+        }
+        .btn-default {
+            background: #fff;
+            color: #555;
+            border: 1px solid #ddd;
+        }
+        .btn-default:hover {
+            border-color: #e94560;
+            color: #e94560;
+        }
+        .btn-sm {
+            padding: 5px 12px;
+            font-size: 12px;
+        }
+        .btn-danger {
+            background: #e74c3c;
+            color: #fff;
+        }
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+        .btn-warning {
+            background: #f39c12;
+            color: #fff;
+        }
+        .btn-warning:hover {
+            background: #e67e22;
+        }
+        .btn-info {
+            background: #3498db;
+            color: #fff;
+        }
+        .btn-info:hover {
+            background: #2980b9;
+        }
+        .btn-outline {
+            background: transparent;
+            color: #e94560;
+            border: 1px solid #e94560;
+        }
+        .btn-outline:hover {
+            background: #e94560;
+            color: #fff;
+        }
+
+        .content-body {
+            padding: 20px 25px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+        .toolbar {
+            background: #fff;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        .toolbar input,
+        .toolbar select {
+            padding: 7px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+            outline: none;
+        }
+        .toolbar input:focus,
+        .toolbar select:focus {
+            border-color: #e94560;
+        }
+
+        .table-wrapper {
+            flex: 1;
+            min-height: 0;
+            overflow: auto;
+            background: #fff;
+            border-radius: 6px;
+            position: relative;
+        }
+        .table-wrapper table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .table-wrapper thead {
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        }
+        .table-wrapper th {
+            background: #f8f9fa;
+            padding: 12px 10px;
+            text-align: left;
+            font-weight: 500;
+            color: #555;
+            border-bottom: 1px solid #eee;
+            white-space: nowrap;
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        }
+        .table-wrapper td {
+            padding: 10px;
+            border-bottom: 1px solid #f0f0f0;
+            color: #333;
+        }
+        .table-wrapper tr:hover {
+            background: #fafafa;
+        }
+        .empty-tip {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        /* 弹窗 */
+        .modal-mask {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal-mask.show {
+            display: flex;
+        }
+        .modal {
+            background: #fff;
+            border-radius: 8px;
+            width: 900px;
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+        .modal-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            background: #fff;
+            z-index: 2;
+        }
+        .modal-title {
+            font-size: 16px;
+            font-weight: 500;
+        }
+        .modal-close {
+            cursor: pointer;
+            color: #999;
+            font-size: 20px;
+        }
+        .modal-body {
+            padding: 20px;
+        }
+        .modal-footer {
+            padding: 15px 20px;
+            border-top: 1px solid #eee;
+            text-align: right;
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            position: sticky;
+            bottom: 0;
+            background: #fff;
+            z-index: 2;
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+        .form-grid .form-item {
+            display: flex;
+            flex-direction: column;
+        }
+        .form-item label {
+            font-size: 13px;
+            color: #555;
+            margin-bottom: 5px;
+        }
+        .form-item input,
+        .form-item select,
+        .form-item textarea {
+            padding: 8px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+            outline: none;
+        }
+        .form-item input:focus,
+        .form-item select:focus,
+        .form-item textarea:focus {
+            border-color: #e94560;
+        }
+        .form-item.full {
+            grid-column: span 3;
+        }
+        .form-item .history-order-list {
+            max-height: 120px;
+            overflow-y: auto;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            background: #fff;
+            display: none;
+            margin-top: 2px;
+        }
+        .form-item .history-order-list .history-item {
+            padding: 6px 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 13px;
+            transition: background 0.15s;
+        }
+        .form-item .history-order-list .history-item:hover {
+            background: #f0f0f0;
+        }
+        .form-item .history-order-list .history-item:last-child {
+            border-bottom: none;
+        }
+        .form-item .history-order-list .history-empty {
+            padding: 10px;
+            color: #999;
+            font-size: 13px;
+            text-align: center;
+        }
+        .sub-fieldset {
+            border: 1px dashed #ddd;
+            border-radius: 4px;
+            padding: 10px 15px;
+            margin-top: 5px;
+        }
+        .sub-fieldset legend {
+            font-size: 12px;
+            color: #888;
+            padding: 0 5px;
+        }
+
+        .action-btn {
+            padding: 4px 8px;
+            font-size: 12px;
+            margin-right: 5px;
+            border: 1px solid #ddd;
+            background: #fff;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .action-btn.edit {
+            color: #e94560;
+            border-color: #e94560;
+        }
+        .action-btn.delete {
+            color: #e74c3c;
+            border-color: #e74c3c;
+        }
+
+        /* 导出配置 */
+        .export-field-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px 15px;
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 5px 0;
+        }
+        .export-field-grid label {
+            display: flex;
+            align-items: center;
+            font-size: 13px;
+            color: #444;
+            cursor: pointer;
+            padding: 3px 0;
+        }
+        .export-field-grid label input[type="checkbox"] {
+            margin-right: 6px;
+            accent-color: #e94560;
+        }
+        .export-options {
+            margin: 15px 0 10px;
+            padding: 12px 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 20px;
+        }
+        .export-options label {
+            display: flex;
+            align-items: center;
+            font-size: 13px;
+            color: #444;
+            cursor: pointer;
+        }
+        .export-options label input[type="checkbox"] {
+            margin-right: 6px;
+            accent-color: #e94560;
+        }
+        .select-all-link {
+            color: #e94560;
+            cursor: pointer;
+            font-size: 13px;
+            margin-left: 10px;
+            text-decoration: underline;
+        }
+        .select-all-link:hover {
+            color: #c0392b;
+        }
+        .field-count {
+            font-size: 12px;
+            color: #999;
+            margin-left: 8px;
+        }
+
+        /* 基础信息表格 */
+        .base-info-table th {
+            background: #f8f9fa;
+            padding: 10px 8px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        .base-info-table td {
+            padding: 8px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .clickable-number {
+            color: #e94560;
+            cursor: pointer;
+            text-decoration: underline;
+            font-weight: 500;
+        }
+        .clickable-number:hover {
+            color: #c0392b;
+        }
+
+        .select-all-checkbox {
+            margin-right: 5px;
+        }
+
+        /* 数据看板 */
+        .dashboard-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            height: 100%;
+        }
+        .dashboard-time-range {
+            background: #fff;
+            padding: 15px 20px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .dashboard-time-range label {
+            font-size: 14px;
+            color: #555;
+        }
+        .dashboard-time-range input[type="date"] {
+            padding: 6px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+            outline: none;
+        }
+        .dashboard-time-range input[type="date"]:focus {
+            border-color: #e94560;
+        }
+        .dashboard-cards {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+        }
+        .dashboard-card {
+            background: #fff;
+            border-radius: 6px;
+            padding: 20px 15px;
+            text-align: center;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+        .dashboard-card .card-number {
+            font-size: 28px;
+            font-weight: 600;
+            color: #333;
+            margin-top: 8px;
+        }
+        .dashboard-card .card-label {
+            font-size: 14px;
+            color: #888;
+        }
+        .dashboard-card .card-icon {
+            font-size: 24px;
+            display: block;
+            margin-bottom: 6px;
+        }
+        .card-color-1 .card-number {
+            color: #e94560;
+        }
+        .card-color-2 .card-number {
+            color: #f39c12;
+        }
+        .card-color-3 .card-number {
+            color: #27ae60;
+        }
+        .card-color-4 .card-number {
+            color: #2980b9;
+        }
+        .card-color-5 .card-number {
+            color: #8e44ad;
+        }
+        .card-color-6 .card-number {
+            color: #d35400;
+        }
+        .card-color-7 .card-number {
+            color: #16a085;
+        }
+        .card-color-8 .card-number {
+            color: #c0392b;
+        }
+        .card-color-9 .card-number {
+            color: #e67e22;
+        }
+        .card-color-10 .card-number {
+            color: #2c3e50;
+        }
+        .card-color-11 .card-number {
+            color: #1abc9c;
+        }
+        .card-color-12 .card-number {
+            color: #9b59b6;
+        }
+        .card-color-13 .card-number {
+            color: #e74c3c;
+        }
+
+        /* 个人中心 */
+        .profile-container {
+            background: #fff;
+            border-radius: 6px;
+            padding: 30px;
+            max-width: 820px;
+            width: 100%;
+            margin: 0 auto;
+        }
+        .profile-header {
+            display: flex;
+            align-items: center;
+            gap: 25px;
+            margin-bottom: 25px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #eee;
+        }
+        .profile-avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            font-weight: 600;
+            color: #fff;
+            flex-shrink: 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            transition: transform 0.2s;
+        }
+        .profile-avatar:hover {
+            transform: scale(1.05);
+        }
+        .profile-info h2 {
+            font-size: 20px;
+            color: #333;
+            margin-bottom: 4px;
+        }
+        .profile-info .profile-sub {
+            color: #888;
+            font-size: 14px;
+        }
+        .profile-info .profile-sub span {
+            margin-right: 18px;
+        }
+        .profile-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 25px;
+            padding: 15px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .profile-stat-item {
+            text-align: center;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+        .profile-stat-item .num {
+            font-size: 24px;
+            font-weight: 600;
+            color: #e94560;
+        }
+        .profile-stat-item .label {
+            font-size: 12px;
+            color: #888;
+            margin-top: 2px;
+        }
+        .profile-section {
+            margin-bottom: 22px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .profile-section:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+        .profile-section-title {
+            font-size: 15px;
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .profile-container .form-item {
+            margin-bottom: 14px;
+        }
+        .profile-container .form-item label {
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 500;
+            color: #555;
+            font-size: 13px;
+        }
+        .profile-container .form-item input,
+        .profile-container .form-item select,
+        .profile-container .form-item textarea {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            outline: none;
+            transition: border 0.2s;
+        }
+        .profile-container .form-item input:focus,
+        .profile-container .form-item select:focus,
+        .profile-container .form-item textarea:focus {
+            border-color: #e94560;
+        }
+        .profile-container .form-item input[disabled] {
+            background: #f5f6fa;
+            color: #666;
+        }
+        .profile-container .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        .profile-container .btn {
+            margin-right: 10px;
+            margin-top: 4px;
+        }
+        .color-picker-group {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 4px;
+        }
+        .color-picker-group .color-option {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .color-picker-group .color-option:hover {
+            transform: scale(1.12);
+        }
+        .color-picker-group .color-option.active {
+            border-color: #333;
+            box-shadow: 0 0 0 2px #fff, 0 0 0 4px #333;
+        }
+        .backup-tip {
+            font-size: 12px;
+            color: #999;
+            margin-top: 6px;
+            line-height: 1.5;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 60px;
+            }
+            .sidebar-logo {
+                font-size: 14px;
+                letter-spacing: 2px;
+            }
+            .menu-title {
+                font-size: 12px;
+                padding: 10px 12px;
+            }
+            .submenu-item {
+                font-size: 12px;
+                padding: 10px 12px 10px 20px;
+            }
+            .main-content {
+                margin-left: 60px;
+            }
+            .export-field-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+            .form-item.full {
+                grid-column: 1;
+            }
+            .modal {
+                width: 95%;
+            }
+            .dashboard-cards {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .dashboard-card .card-number {
+                font-size: 22px;
+            }
+            .profile-header {
+                flex-direction: column;
+                text-align: center;
+            }
+            .profile-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .profile-container .form-row {
+                grid-template-columns: 1fr;
+            }
+            .profile-info .profile-sub span {
+                display: block;
+                margin-bottom: 4px;
+            }
+        }
+        @media (max-width: 480px) {
+            .dashboard-cards {
+                grid-template-columns: 1fr;
+            }
+            .profile-stats {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 启动页 -->
+    <div id="splash-screen">
+        <div class="splash-logo">gorenje</div>
+        <div class="splash-line"></div>
+        <div class="splash-copyright">灿然科技@2026 版权所有</div>
+    </div>
+
+    <!-- 登录注册页 -->
+    <div id="auth-screen">
+        <div class="auth-box">
+            <div class="auth-title">
+                灿然科技 ✖ 古洛尼（绵阳）管理系统
+                <small>v2.0.1</small>
+            </div>
+            <div class="auth-tabs">
+                <div class="auth-tab active" data-tab="login" onclick="switchTab('login')">登录</div>
+                <div class="auth-tab" data-tab="register" onclick="switchTab('register')">注册</div>
+            </div>
+            <div id="login-form">
+                <div class="form-group">
+                    <label>账号（全英文）</label>
+                    <input type="text" id="login-username" placeholder="请输入账号">
+                </div>
+                <div class="form-group">
+                    <label>邮箱</label>
+                    <input type="email" id="login-email" placeholder="请输入注册邮箱">
+                </div>
+                <div class="form-group">
+                    <label>密码（数字+小写字母）</label>
+                    <input type="password" id="login-password" placeholder="请输入密码">
+                </div>
+                <div class="remember-box">
+                    <input type="checkbox" id="remember-me">
+                    <label for="remember-me">记住密码</label>
+                </div>
+                <div class="auth-tip" id="login-tip"></div>
+                <button class="auth-btn" onclick="doLogin()">登 录</button>
+            </div>
+            <div id="register-form" style="display:none;">
+                <div class="form-group">
+                    <label>账号（全英文）</label>
+                    <input type="text" id="reg-username" placeholder="只能输入英文字母">
+                </div>
+                <div class="form-group">
+                    <label>邮箱</label>
+                    <input type="email" id="reg-email" placeholder="请输入邮箱（用于唯一性确认）">
+                </div>
+                <div class="form-group">
+                    <label>密码（数字+小写字母）</label>
+                    <input type="password" id="reg-password" placeholder="至少6位，数字+小写字母组合">
+                </div>
+                <div class="form-group">
+                    <label>确认密码</label>
+                    <input type="password" id="reg-password2" placeholder="再次输入密码">
+                </div>
+                <div class="auth-tip" id="reg-tip"></div>
+                <button class="auth-btn" onclick="doRegister()">注 册</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主系统 -->
+    <div id="main-system">
+        <div class="sidebar">
+            <div class="sidebar-top">
+                <div class="sidebar-logo" style="text-align: center; line-height: 1.8;">
+                    <span style="font-size: 28px; font-weight: bold;">gorenje</span><br>
+                    <span style="font-size: 18px;">×</span><br>
+                    <span style="font-size: 16px; color: #999;">灿然科技</span>
+                </div>
+                <div class="menu-group">
+                    <div class="menu-title" onclick="toggleMenu(this)">
+                        <span>📦 入库管理</span>
+                        <span class="menu-arrow">▼</span>
+                    </div>
+                    <div class="submenu">
+                        <div class="submenu-item" onclick="showPage('purchase-in')">1、采购入库</div>
+                        <div class="submenu-item" onclick="showPage('purchase-exchange')">2、采购换货</div>
+                        <div class="submenu-item" onclick="showPage('purchase-return')">3、采购退货</div>
+                    </div>
+                </div>
+                <div class="menu-group">
+                    <div class="menu-title" onclick="toggleMenu(this)">
+                        <span>🛒 零售管理</span>
+                        <span class="menu-arrow">▼</span>
+                    </div>
+                    <div class="submenu">
+                        <div class="submenu-item" onclick="showPage('retail-order')">1、零售订单</div>
+                        <div class="submenu-item" onclick="showPage('retail-sell')">2、零售开单</div>
+                        <div class="submenu-item" onclick="showPage('retail-exchange')">3、零售换货</div>
+                        <div class="submenu-item" onclick="showPage('retail-return')">4、零售退货</div>
+                    </div>
+                </div>
+                <div class="menu-group">
+                    <div class="menu-title" onclick="toggleMenu(this)">
+                        <span>📊 库存管理</span>
+                        <span class="menu-arrow">▼</span>
+                    </div>
+                    <div class="submenu">
+                        <div class="submenu-item" onclick="showPage('stock-daily')">库存日报</div>
+                    </div>
+                </div>
+                <div class="menu-group">
+                    <div class="menu-title" onclick="toggleMenu(this)">
+                        <span>📱 样机管理</span>
+                        <span class="menu-arrow">▼</span>
+                    </div>
+                    <div class="submenu">
+                        <div class="submenu-item" onclick="showPage('sample-display')">1、门店上样</div>
+                        <div class="submenu-item" onclick="showPage('sample-sell')">2、样机销售</div>
+                    </div>
+                </div>
+                <div class="menu-group">
+                    <div class="menu-title" onclick="toggleMenu(this)">
+                        <span>📋 基础信息</span>
+                        <span class="menu-arrow">▼</span>
+                    </div>
+                    <div class="submenu">
+                        <div class="submenu-item" onclick="showPage('base-product')">1、商品信息</div>
+                        <div class="submenu-item" onclick="showPage('base-employee')">2、员工信息</div>
+                        <div class="submenu-item" onclick="showPage('base-supplier')">3、供应商信息</div>
+                    </div>
+                </div>
+                <div class="menu-group">
+                    <div class="menu-title" onclick="toggleMenu(this)">
+                        <span>📈 数据看板</span>
+                        <span class="menu-arrow">▼</span>
+                    </div>
+                    <div class="submenu">
+                        <div class="submenu-item" onclick="showPage('dashboard')">📊 实时监控</div>
+                    </div>
+                </div>
+            </div>
+            <div class="sidebar-bottom">
+                <div class="menu-user" onclick="showPage('profile')">👤 个人中心</div>
+                <div class="version-info">灿然科技管理系统 V2.0.1<br>灿然科技×古洛尼（绵阳）</div>
+            </div>
+        </div>
+
+        <!-- 主内容区 -->
+        <div class="main-content" id="content-area">
+            <!-- 动态内容渲染区 -->
+        </div>
+    </div>
+
+    <!-- 通用弹窗 -->
+    <div class="modal-mask" id="modal-mask">
+        <div class="modal" id="modal-box">
+            <div class="modal-header">
+                <span class="modal-title" id="modal-title">标题</span>
+                <span class="modal-close" onclick="closeModal()">×</span>
+            </div>
+            <div class="modal-body" id="modal-body"></div>
+            <div class="modal-footer" id="modal-footer"></div>
+        </div>
+    </div>
+
+    <script>
+        // ===================================================================
+        // Supabase 配置
+        // ===================================================================
+        const SUPABASE_URL = 'https://lujaofkbulprhyfqsvlm.supabase.co';
+        const SUPABASE_ANON_KEY =
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx1amFvZmtidWxwcmh5ZnFzdmxtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMxNTcyNzcsImV4cCI6MjA5ODczMzI3N30.Yee_khSbmufdOs1rpnA_KyajM9bMNe93od-Ty8jyYxs';
+
+        console.log('🚀 系统启动中 v2.0.1');
+
+        // 初始化 Supabase
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // 全局状态
+        let currentUser = null;
+        let currentUserId = null;
+        let appData = {
+            purchaseIn: [],
+            purchaseExchange: [],
+            purchaseReturn: [],
+            retailOrder: [],
+            retailSell: [],
+            retailExchange: [],
+            retailReturn: [],
+            sampleDisplay: [],
+            sampleSell: [],
+            stock: [],
+            productInfo: [],
+            employeeInfo: [],
+            supplierInfo: []
+        };
+        let dataReady = false;
+        let currentPage = '';
+        let repeatFilterMode = false;
+
+        // ===================================================================
+        // Tab 切换函数
+        // ===================================================================
+        function switchTab(tab) {
+            const tabs = document.querySelectorAll('.auth-tab');
+            tabs.forEach(t => {
+                if (t.dataset.tab === tab) {
+                    t.classList.add('active');
+                } else {
+                    t.classList.remove('active');
+                }
+            });
+
+            if (tab === 'login') {
+                document.getElementById('login-form').style.display = 'block';
+                document.getElementById('register-form').style.display = 'none';
+            } else {
+                document.getElementById('login-form').style.display = 'none';
+                document.getElementById('register-form').style.display = 'block';
+            }
+        }
+
+        // 给所有 .auth-tab 绑定点击事件
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.auth-tab').forEach(function(tab) {
+                tab.addEventListener('click', function() {
+                    const tabName = this.dataset.tab;
+                    switchTab(tabName);
+                });
+            });
+        });
+
+        // ===================================================================
+        // 启动
+        // ===================================================================
+        window.onload = function() {
+            console.log('⏳ 初始化...');
+
+            // 2秒后显示登录页
+            setTimeout(function() {
+                const splash = document.getElementById('splash-screen');
+                if (splash) {
+                    splash.style.opacity = '0';
+                    setTimeout(function() {
+                        splash.style.display = 'none';
+                        document.getElementById('auth-screen').style.display = 'flex';
+                        console.log('✅ 已显示登录页');
+                        checkRememberedLogin();
+                    }, 500);
+                }
+            }, 2000);
+
+            // 测试 Supabase 连接
+            setTimeout(async function() {
+                try {
+                    const { data, error } = await supabase
+                        .from('users')
+                        .select('count', { count: 'exact', head: true })
+                        .limit(1);
+
+                    if (error) {
+                        console.warn('⚠️ Supabase 连接警告:', error.message);
+                    } else {
+                        console.log('✅ Supabase 连接正常');
+                    }
+                } catch (err) {
+                    console.warn('⚠️ Supabase 连接失败:', err.message);
+                }
+            }, 3000);
+        };
+
+        // ===================================================================
+        // 辅助函数
+        // ===================================================================
+        function checkRememberedLogin() {
+            const remembered = sessionStorage.getItem('gorenje_remember');
+            const lastUser = localStorage.getItem('gorenje_last_user');
+            if (remembered === '1' && lastUser) {
+                document.getElementById('login-username').value = lastUser;
+            } else if (lastUser) {
+                document.getElementById('login-username').value = lastUser;
+            }
+        }
+
+        // ===================================================================
+        // 注册函数
+        // ===================================================================
+        async function doRegister() {
+            const name = document.getElementById('reg-username').value.trim();
+            const email = document.getElementById('reg-email').value.trim();
+            const pwd = document.getElementById('reg-password').value;
+            const pwd2 = document.getElementById('reg-password2').value;
+            const tip = document.getElementById('reg-tip');
+
+            // 验证输入
+            if (!name) {
+                tip.textContent = '请输入账号';
+                tip.style.display = 'block';
+                return;
+            }
+            if (!/^[a-zA-Z]+$/.test(name)) {
+                tip.textContent = '账号必须为全英文字母';
+                tip.style.display = 'block';
+                return;
+            }
+            if (!email) {
+                tip.textContent = '请输入邮箱';
+                tip.style.display = 'block';
+                return;
+            }
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                tip.textContent = '请输入有效的邮箱地址';
+                tip.style.display = 'block';
+                return;
+            }
+            if (!/^(?=.*[a-z])(?=.*\d)[a-z\d]{6,}$/.test(pwd)) {
+                tip.textContent = '密码需6位以上，数字+小写字母组合';
+                tip.style.display = 'block';
+                return;
+            }
+            if (pwd !== pwd2) {
+                tip.textContent = '两次密码不一致';
+                tip.style.display = 'block';
+                return;
+            }
+
+            try {
+                console.log('📝 注册尝试:', name);
+
+                // 检查用户名是否已存在
+                const { data: existingUser, error: checkError } = await supabase
+                    .from('users')
+                    .select('id')
+                    .eq('username', name)
+                    .maybeSingle();
+
+                if (checkError) throw checkError;
+                if (existingUser) {
+                    tip.textContent = '账号已存在';
+                    tip.style.display = 'block';
+                    return;
+                }
+
+                // 检查邮箱是否已存在
+                const { data: existingEmail, error: emailCheckError } = await supabase
+                    .from('users')
+                    .select('id')
+                    .eq('email', email)
+                    .maybeSingle();
+
+                if (emailCheckError) throw emailCheckError;
+                if (existingEmail) {
+                    tip.textContent = '邮箱已被注册';
+                    tip.style.display = 'block';
+                    return;
+                }
+
+                // 直接在 users 表中创建用户
+                const newUser = {
+                    username: name,
+                    email: email,
+                    password: pwd,
+                    nickname: '',
+                    bio: '',
+                    default_warehouse: '新库房',
+                    avatar_color: '#e94560',
+                    register_time: new Date().toLocaleString()
+                };
+
+                const { data: insertedUser, error: insertError } = await supabase
+                    .from('users')
+                    .insert([newUser])
+                    .select()
+                    .single();
+
+                if (insertError) throw insertError;
+
+                tip.style.color = '#27ae60';
+                tip.textContent = '✅ 注册成功！请登录';
+                tip.style.display = 'block';
+                console.log('✅ 注册成功:', name);
+
+                setTimeout(() => {
+                    switchTab('login');
+                    document.getElementById('login-username').value = name;
+                    document.getElementById('login-email').value = email;
+                }, 1000);
+
+            } catch (err) {
+                console.error('注册失败:', err);
+                tip.textContent = '注册失败: ' + (err.message || '未知错误');
+                tip.style.display = 'block';
+            }
+        }
+
+        // ===================================================================
+        // 登录函数
+        // ===================================================================
+        async function doLogin() {
+            const name = document.getElementById('login-username').value.trim();
+            const email = document.getElementById('login-email').value.trim();
+            const pwd = document.getElementById('login-password').value;
+            const remember = document.getElementById('remember-me').checked;
+            const tip = document.getElementById('login-tip');
+
+            if (!name || !email || !pwd) {
+                tip.textContent = '请完整填写账号、邮箱和密码';
+                tip.style.display = 'block';
+                return;
+            }
+
+            try {
+                console.log('🔍 登录尝试:', name);
+
+                // 直接查询 users 表验证
+                const { data: userData, error: userError } = await supabase
+                    .from('users')
+                    .select('*')
+                    .eq('username', name)
+                    .eq('email', email)
+                    .eq('password', pwd)
+                    .maybeSingle();
+
+                if (userError) {
+                    console.error('查询用户失败:', userError);
+                    tip.textContent = '登录失败: ' + userError.message;
+                    tip.style.display = 'block';
+                    return;
+                }
+
+                if (!userData) {
+                    tip.textContent = '账号、邮箱或密码错误';
+                    tip.style.display = 'block';
+                    return;
+                }
+
+                currentUserId = userData.id;
+                currentUser = userData;
+
+                if (remember) {
+                    sessionStorage.setItem('gorenje_remember', '1');
+                    localStorage.setItem('gorenje_last_user', name);
+                } else {
+                    sessionStorage.setItem('gorenje_remember', '0');
+                }
+
+                console.log('✅ 登录成功:', name);
+                await loadAllUserData();
+                enterSystem();
+
+            } catch (err) {
+                console.error('登录异常:', err);
+                tip.textContent = '登录异常: ' + (err.message || '未知错误');
+                tip.style.display = 'block';
+            }
+        }
+
+        // ===================================================================
+        // 加载用户数据
+        // ===================================================================
+        async function loadAllUserData() {
+            if (!currentUserId) return;
+
+            console.log('📦 加载用户数据...');
+
+            const tables = ['purchase_in', 'purchase_exchange', 'purchase_return',
+                'retail_order', 'retail_sell', 'retail_exchange', 'retail_return',
+                'sample_display', 'sample_sell', 'stock',
+                'product_info', 'employee_info', 'supplier_info'
+            ];
+            const keys = ['purchaseIn', 'purchaseExchange', 'purchaseReturn',
+                'retailOrder', 'retailSell', 'retailExchange', 'retailReturn',
+                'sampleDisplay', 'sampleSell', 'stock',
+                'productInfo', 'employeeInfo', 'supplierInfo'
+            ];
+
+            try {
+                const results = await Promise.allSettled(tables.map(t => fetchUserData(t)));
+                keys.forEach((k, i) => {
+                    if (results[i].status === 'fulfilled') {
+                        appData[k] = results[i].value || [];
+                    } else {
+                        appData[k] = [];
+                        console.warn(`加载 ${k} 失败:`, results[i].reason);
+                    }
+                });
+
+                appData.users = {};
+                appData.currentUser = currentUser ? currentUser.username : null;
+                dataReady = true;
+                console.log('✅ 数据加载完成');
+            } catch (err) {
+                console.error('加载数据失败:', err);
+                dataReady = true;
+            }
+        }
+
+        // ===================================================================
+        // 获取用户数据
+        // ===================================================================
+        async function fetchUserData(tableName) {
+            if (!currentUserId) return [];
+            try {
+                const { data, error } = await supabase
+                    .from(tableName)
+                    .select('*')
+                    .eq('user_id', currentUserId)
+                    .order('created_at', { ascending: false });
+                if (error) {
+                    console.warn(`加载 ${tableName} 失败:`, error.message);
+                    return [];
+                }
+                return data || [];
+            } catch (err) {
+                console.warn(`加载 ${tableName} 异常:`, err.message);
+                return [];
+            }
+        }
+
+        // ===================================================================
+        // 进入系统
+        // ===================================================================
+        function enterSystem() {
+            console.log('🏠 进入系统');
+            document.getElementById('auth-screen').style.display = 'none';
+            document.getElementById('main-system').style.display = 'block';
+            const firstMenu = document.querySelector('.menu-title');
+            if (firstMenu) toggleMenu(firstMenu);
+            showPage('dashboard');
+            // 订阅实时更新
+            subscribeRealtime();
+        }
+
+        // ===================================================================
+        // 实时订阅
+        // ===================================================================
+        let subscriptionChannel = null;
+
+        function subscribeRealtime() {
+            if (subscriptionChannel) {
+                subscriptionChannel.unsubscribe();
+            }
+            if (!currentUserId) return;
+
+            const tables = ['purchase_in', 'purchase_exchange', 'purchase_return',
+                'retail_order', 'retail_sell', 'retail_exchange', 'retail_return',
+                'sample_display', 'sample_sell', 'stock',
+                'product_info', 'employee_info', 'supplier_info'
+            ];
+            const keys = ['purchaseIn', 'purchaseExchange', 'purchaseReturn',
+                'retailOrder', 'retailSell', 'retailExchange', 'retailReturn',
+                'sampleDisplay', 'sampleSell', 'stock',
+                'productInfo', 'employeeInfo', 'supplierInfo'
+            ];
+
+            subscriptionChannel = supabase
+                .channel('db-changes')
+                .on('postgres_changes', { event: '*', schema: 'public' }, async (payload) => {
+                    if (payload.new && payload.new.user_id !== currentUserId) return;
+                    if (payload.old && payload.old.user_id !== currentUserId) return;
+                    const tableName = payload.table;
+                    const idx = tables.indexOf(tableName);
+                    if (idx !== -1) {
+                        const key = keys[idx];
+                        const fresh = await fetchUserData(tableName);
+                        appData[key] = fresh || [];
+                        const currentType = getCurrentDataType();
+                        if (currentType === key) {
+                            renderTable(key);
+                        }
+                        if (currentType === 'stock' && key === 'stock') {
+                            renderTable('stock');
+                        }
+                        const stockRelated = ['purchase_in', 'purchase_exchange', 'purchase_return',
+                            'retail_order', 'retail_sell', 'retail_exchange', 'retail_return',
+                            'sample_display'
+                        ];
+                        if (stockRelated.includes(tableName)) {
+                            await updateStock();
+                        }
+                    }
+                })
+                .subscribe();
+        }
+
+        function getCurrentDataType() {
+            const page = currentPage;
+            const map = {
+                'purchase-in': 'purchaseIn',
+                'purchase-exchange': 'purchaseExchange',
+                'purchase-return': 'purchaseReturn',
+                'retail-order': 'retailOrder',
+                'retail-sell': 'retailSell',
+                'retail-exchange': 'retailExchange',
+                'retail-return': 'retailReturn',
+                'stock-daily': 'stock',
+                'sample-display': 'sampleDisplay',
+                'sample-sell': 'sampleSell',
+                'base-product': 'productInfo',
+                'base-employee': 'employeeInfo',
+                'base-supplier': 'supplierInfo',
+            };
+            return map[page] || '';
+        }
+
+        // ===================================================================
+        // 菜单切换
+        // ===================================================================
+        function toggleMenu(el) {
+            const wasExpanded = el.classList.contains('expanded');
+            document.querySelectorAll('.menu-title').forEach(m => m.classList.remove('expanded'));
+            document.querySelectorAll('.submenu').forEach(s => s.classList.remove('open'));
+
+            if (!wasExpanded) {
+                el.classList.add('expanded');
+                el.nextElementSibling.classList.add('open');
+            }
+        }
+
+        // ===================================================================
+        // 页面切换
+        // ===================================================================
+        function showPage(page) {
+            currentPage = page;
+            document.querySelectorAll('.submenu-item, .menu-user').forEach(i => i.classList.remove('active'));
+            if (page === 'profile') {
+                document.querySelector('.menu-user')?.classList.add('active');
+            } else {
+                document.querySelectorAll('.submenu-item').forEach(item => {
+                    const onclick = item.getAttribute('onclick');
+                    if (onclick && onclick.includes(`'${page}'`)) {
+                        item.classList.add('active');
+                    }
+                });
+            }
+
+            if (page === 'dashboard') {
+                renderDashboard();
+                return;
+            }
+            if (page === 'profile') {
+                renderProfile();
+                return;
+            }
+            if (page.startsWith('base-')) {
+                renderBaseInfoPage(page);
+                return;
+            }
+
+            const pages = {
+                'purchase-in': { title: '采购入库', type: 'purchaseIn' },
+                'purchase-exchange': { title: '采购换货', type: 'purchaseExchange' },
+                'purchase-return': { title: '采购退货', type: 'purchaseReturn' },
+                'retail-order': { title: '零售订单', type: 'retailOrder' },
+                'retail-sell': { title: '零售开单', type: 'retailSell' },
+                'retail-exchange': { title: '零售换货', type: 'retailExchange' },
+                'retail-return': { title: '零售退货', type: 'retailReturn' },
+                'stock-daily': { title: '库存日报', type: 'stock' },
+                'sample-display': { title: '门店上样', type: 'sampleDisplay' },
+                'sample-sell': { title: '样机销售', type: 'sampleSell' }
+            };
+
+            const info = pages[page];
+            if (info) renderContent(info.title, info.type);
+        }
+
+        // ===================================================================
+        // 数据看板
+        // ===================================================================
+        function renderDashboard() {
+            const area = document.getElementById('content-area');
+            const now = new Date();
+            const endDate = now.toISOString().split('T')[0];
+            const start = new Date(now);
+            start.setMonth(start.getMonth() - 1);
+            const startDate = start.toISOString().split('T')[0];
+
+            const brands = getProductBrands();
+            let brandOptions = '<option value="">全部品牌</option>';
+            brands.forEach(b => {
+                brandOptions += `<option value="${b}">${b}</option>`;
+            });
+
+            let html = `
+            <div class="content-header">
+                <div class="page-title">📊 数据看板</div>
+                <div class="header-actions">
+                    <button class="btn btn-success" onclick="exportDashboardExcel()">📤 导出Excel</button>
+                    <button class="btn btn-default" onclick="refreshDashboard()">🔄 刷新</button>
+                </div>
+            </div>
+            <div class="content-body">
+                <div class="dashboard-container">
+                    <div class="dashboard-time-range">
+                        <label>时间范围：</label>
+                        <input type="date" id="dashboard-start" value="${startDate}" onchange="refreshDashboard()">
+                        <span>至</span>
+                        <input type="date" id="dashboard-end" value="${endDate}" onchange="refreshDashboard()">
+                        <button class="btn btn-sm btn-default" onclick="setDashboardRange('today')">今日</button>
+                        <button class="btn btn-sm btn-default" onclick="setDashboardRange('week')">本周</button>
+                        <button class="btn btn-sm btn-default" onclick="setDashboardRange('month')">本月</button>
+                        <button class="btn btn-sm btn-default" onclick="setDashboardRange('lastMonth')">最近一个月</button>
+                        <button class="btn btn-sm btn-default" onclick="setDashboardRange('tenYears')">最近十年</button>
+                        <label style="margin-left:10px;">入库品牌：</label>
+                        <select id="dashboard-brand-filter" onchange="refreshDashboard()">
+                            ${brandOptions}
+                        </select>
+                    </div>
+                    <div class="dashboard-cards" id="dashboard-cards"></div>
+                </div>
+            </div>
+            `;
+            area.innerHTML = html;
+            updateDashboardCards();
+        }
+
+        function setDashboardRange(range) {
+            const now = new Date();
+            let start = new Date(now);
+            let end = new Date(now);
+            if (range === 'today') { /* today */ } else if (range === 'week') { start.setDate(now.getDate() - 7); } else if (
+                range === 'month') { start.setDate(1); } else if (range === 'lastMonth') { start.setMonth(now.getMonth() -
+                    1); } else if (range === 'tenYears') { start.setFullYear(now.getFullYear() - 10); }
+            const startStr = start.toISOString().split('T')[0];
+            const endStr = end.toISOString().split('T')[0];
+            const startEl = document.getElementById('dashboard-start');
+            const endEl = document.getElementById('dashboard-end');
+            if (startEl) startEl.value = startStr;
+            if (endEl) endEl.value = endStr;
+            refreshDashboard();
+        }
+
+        function refreshDashboard() {
+            updateDashboardCards();
+        }
+
+        function updateDashboardCards() {
+            const start = document.getElementById('dashboard-start')?.value || '';
+            const end = document.getElementById('dashboard-end')?.value || '';
+            const brandFilter = document.getElementById('dashboard-brand-filter')?.value || '';
+
+            const retailTypes = ['retailOrder', 'retailSell', 'retailExchange', 'retailReturn'];
+            let allOrders = [];
+            retailTypes.forEach(type => {
+                const items = appData[type] || [];
+                items.forEach(item => {
+                    allOrders.push({ ...item, _type: type });
+                });
+            });
+
+            let filtered = allOrders;
+            if (start && end) {
+                filtered = filtered.filter(item => {
+                    const d = item.order_date || item.orderDate || '';
+                    return d >= start && d <= end;
+                });
+            } else if (start) {
+                filtered = filtered.filter(item => (item.order_date || item.orderDate || '') >= start);
+            } else if (end) {
+                filtered = filtered.filter(item => (item.order_date || item.orderDate || '') <= end);
+            }
+
+            const totalOrders = filtered.length;
+            const returnOrders = filtered.filter(item => item._type === 'retailReturn').length;
+            const salesOrders = filtered.filter(item => item._type === 'retailOrder' || item._type === 'retailSell').length;
+
+            let totalPayAmount = 0,
+                totalSellAmount = 0,
+                totalDebt = 0,
+                totalPosAmount = 0,
+                totalSubsidy = 0;
+            let totalCostPrice = 0;
+            let totalSalesAmount = 0;
+            let totalRetailPrice = 0;
+            let totalProfit = 0;
+
+            filtered.forEach(item => {
+                const pay = parseFloat(item.pay_amount || item.payAmount || 0);
+                const sell = parseFloat(item.sell_price || item.sellPrice || 0);
+                const pos = parseFloat(item.pos_amount || item.posAmount || 0);
+                const subsidy = parseFloat(item.subsidy_amount || item.subsidyAmount || 0);
+                const retail = parseFloat(item.retail_price || item.retailPrice || 0);
+                const cost = parseFloat(item.cost_price || item.costPrice || 0);
+
+                if (item._type === 'retailOrder' || item._type === 'retailSell') {
+                    totalCostPrice += cost;
+                    totalSalesAmount += sell;
+                }
+                totalRetailPrice += retail;
+
+                totalPayAmount += pay;
+                totalSellAmount += sell;
+                if (sell > pay) totalDebt += (sell - pay);
+                totalPosAmount += pos;
+                totalSubsidy += subsidy;
+            });
+            totalProfit = totalSalesAmount - totalCostPrice;
+
+            let grossMarginRate = 0;
+            if (totalSellAmount > 0) {
+                grossMarginRate = (totalProfit / totalSellAmount) * 100;
+            }
+
+            let purchaseItems = appData.purchaseIn || [];
+            if (start && end) {
+                purchaseItems = purchaseItems.filter(item => {
+                    const d = item.purchase_date || item.purchaseDate || '';
+                    return d >= start && d <= end;
+                });
+            } else if (start) {
+                purchaseItems = purchaseItems.filter(item => (item.purchase_date || item.purchaseDate || '') >= start);
+            } else if (end) {
+                purchaseItems = purchaseItems.filter(item => (item.purchase_date || item.purchaseDate || '') <= end);
+            }
+            if (brandFilter) {
+                purchaseItems = purchaseItems.filter(item => (item.brand || '') === brandFilter);
+            }
+            let totalPurchaseAmount = 0;
+            purchaseItems.forEach(item => {
+                const amt = parseFloat(item.amount || 0);
+                totalPurchaseAmount += amt;
+            });
+
+            let returnItems = appData.purchaseReturn || [];
+            if (start && end) {
+                returnItems = returnItems.filter(item => {
+                    const d = item.purchase_date || item.purchaseDate || '';
+                    return d >= start && d <= end;
+                });
+            } else if (start) {
+                returnItems = returnItems.filter(item => (item.purchase_date || item.purchaseDate || '') >= start);
+            } else if (end) {
+                returnItems = returnItems.filter(item => (item.purchase_date || item.purchaseDate || '') <= end);
+            }
+            if (brandFilter) {
+                returnItems = returnItems.filter(item => (item.brand || '') === brandFilter);
+            }
+            let totalReturnAmount = 0;
+            returnItems.forEach(item => {
+                const amt = parseFloat(item.amount || 0);
+                totalReturnAmount += amt;
+            });
+            const netPurchaseAmount = totalPurchaseAmount - totalReturnAmount;
+
+            const formatCurrency = (val) => {
+                return '¥' + val.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            };
+
+            const cards = [
+                { label: '总订单数', value: totalOrders, icon: '📋', color: 'card-color-1', format: 'number' },
+                { label: '销售单数', value: salesOrders, icon: '🛒', color: 'card-color-3', format: 'number' },
+                { label: '退货订单数', value: returnOrders, icon: '↩️', color: 'card-color-2', format: 'number' },
+                { label: '收款金额', value: totalPayAmount, icon: '💰', color: 'card-color-4', format: 'currency' },
+                { label: '销售金额', value: totalSellAmount, icon: '💵', color: 'card-color-5', format: 'currency' },
+                { label: '零售金额', value: totalRetailPrice, icon: '🏷️', color: 'card-color-11', format: 'currency' },
+                { label: '进货总成本', value: totalCostPrice, icon: '📦', color: 'card-color-13', format: 'currency' },
+                { label: '欠款金额', value: totalDebt, icon: '📉', color: 'card-color-6', format: 'currency' },
+                { label: 'POS机交易金额', value: totalPosAmount, icon: '💳', color: 'card-color-7', format: 'currency' },
+                { label: '国补金额', value: totalSubsidy, icon: '🎯', color: 'card-color-8', format: 'currency' },
+                { label: '毛利金额', value: totalProfit, icon: '📈', color: 'card-color-9', format: 'currency' },
+                { label: '毛利率', value: grossMarginRate, icon: '📊', color: 'card-color-12', format: 'percent' },
+                { label: '入库金额（净）', value: netPurchaseAmount, icon: '🏢', color: 'card-color-10', format: 'currency' }
+            ];
+
+            const container = document.getElementById('dashboard-cards');
+            if (!container) return;
+
+            let cardHtml = '';
+            cards.forEach(c => {
+                let displayVal = c.value;
+                if (c.format === 'currency') {
+                    displayVal = formatCurrency(c.value);
+                } else if (c.format === 'percent') {
+                    displayVal = c.value.toFixed(2) + '%';
+                } else {
+                    displayVal = c.value;
+                }
+                cardHtml += `
+                    <div class="dashboard-card ${c.color}">
+                        <span class="card-icon">${c.icon}</span>
+                        <div class="card-number">${displayVal}</div>
+                        <div class="card-label">${c.label}</div>
+                    </div>
+                `;
+            });
+            container.innerHTML = cardHtml;
+        }
+
+        function exportDashboardExcel() {
+            alert('导出功能已简化，请使用各模块的导出功能');
+        }
+
+        // ===================================================================
+        // 个人中心
+        // ===================================================================
+        const AVATAR_COLORS = ['#e94560', '#f39c12', '#27ae60', '#2980b9', '#8e44ad', '#d35400', '#16a085', '#c0392b', '#2c3e50',
+            '#7f8c8d'
+        ];
+
+        function getAvatarColor(username) {
+            if (!username) return AVATAR_COLORS[0];
+            const userInfo = currentUser || {};
+            if (userInfo.avatar_color) return userInfo.avatar_color;
+            const idx = username.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0) % AVATAR_COLORS.length;
+            return AVATAR_COLORS[idx];
+        }
+
+        function renderProfile() {
+            const area = document.getElementById('content-area');
+            const user = currentUser;
+            if (!user) {
+                area.innerHTML = '<div style="padding:40px;text-align:center;color:#999;">请先登录</div>';
+                return;
+            }
+
+            const avatarLetter = (user.nickname || user.username).charAt(0).toUpperCase() || 'U';
+            const avatarColor = user.avatar_color || '#e94560';
+
+            const countStats = [
+                { label: '采购入库', count: (appData.purchaseIn || []).length },
+                { label: '零售订单', count: (appData.retailOrder || []).length },
+                { label: '商品信息', count: (appData.productInfo || []).length },
+                { label: '员工信息', count: (appData.employeeInfo || []).length },
+                { label: '供应商信息', count: (appData.supplierInfo || []).length },
+            ];
+
+            let colorOptionsHtml = AVATAR_COLORS.map(c =>
+                `<div class="color-option ${c === avatarColor ? 'active' : ''}" style="background:${c};" onclick="selectAvatarColor('${c}')" title="${c}"></div>`
+            ).join('');
+
+            let html = `
+            <div class="content-header">
+                <div class="page-title">👤 个人中心</div>
+                <div class="header-actions">
+                    <button class="btn btn-default" onclick="renderProfile()">🔄 刷新</button>
+                </div>
+            </div>
+            <div class="content-body">
+                <div class="profile-container">
+
+                    <div class="profile-header">
+                        <div class="profile-avatar" style="background:${avatarColor};">${avatarLetter}</div>
+                        <div class="profile-info">
+                            <h2>${user.nickname || user.username}</h2>
+                            <div class="profile-sub">
+                                <span>📌 账号：${user.username}</span>
+                                <span>📧 邮箱：${user.email}</span>
+                                <span>📅 注册：${user.register_time || '未知'}</span>
+                            </div>
+                            <div class="profile-sub" style="margin-top:6px;color:#aaa;font-size:13px;">
+                                <span>🏷️ ${user.bio || '这个人很懒，什么都没写~'}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="profile-stats">
+                        ${countStats.map(s => `
+                            <div class="profile-stat-item">
+                                <div class="num">${s.count}</div>
+                                <div class="label">${s.label}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+
+                    <div class="profile-section">
+                        <div class="profile-section-title">⚙️ 个人设置</div>
+                        <div class="form-row">
+                            <div class="form-item">
+                                <label>昵称</label>
+                                <input type="text" id="profile-nickname" value="${user.nickname || ''}" placeholder="请输入昵称">
+                            </div>
+                            <div class="form-item">
+                                <label>默认仓库</label>
+                                <select id="profile-default-warehouse">
+                                    <option value="新库房" ${user.default_warehouse === '新库房' ? 'selected' : ''}>新库房</option>
+                                    <option value="老库房" ${user.default_warehouse === '老库房' ? 'selected' : ''}>老库房</option>
+                                    <option value="无" ${user.default_warehouse === '无' ? 'selected' : ''}>无</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-item">
+                            <label>个人简介</label>
+                            <textarea id="profile-bio" rows="2" placeholder="写一段简短的介绍吧~">${user.bio || ''}</textarea>
+                        </div>
+                        <div class="form-item">
+                            <label>头像颜色</label>
+                            <div class="color-picker-group">${colorOptionsHtml}</div>
+                            <span style="font-size:12px;color:#999;display:block;margin-top:4px;">点击色块更换头像背景色</span>
+                        </div>
+                        <div style="margin-top:8px;">
+                            <button class="btn btn-primary" onclick="updateProfile()">💾 更新资料</button>
+                        </div>
+                    </div>
+
+                    <div class="profile-section">
+                        <div class="profile-section-title">🔐 账号安全</div>
+                        <div class="form-row">
+                            <div class="form-item">
+                                <label>新密码（留空则不修改）</label>
+                                <input type="password" id="profile-new-pwd" placeholder="请输入新密码">
+                            </div>
+                            <div class="form-item">
+                                <label>确认密码</label>
+                                <input type="password" id="profile-confirm-pwd" placeholder="再次输入新密码">
+                            </div>
+                        </div>
+                        <div style="margin-top:4px;">
+                            <button class="btn btn-danger" onclick="logout()">🚪 退出登录</button>
+                            <span style="font-size:12px;color:#999;margin-left:12px;">退出后需要重新登录</span>
+                        </div>
+                    </div>
+
+                    <div class="profile-section">
+                        <div class="profile-section-title">💾 数据管理</div>
+                        <div style="display:flex;flex-wrap:wrap;gap:10px;">
+                            <button class="btn btn-success" onclick="exportUserData()">📤 导出数据备份</button>
+                            <button class="btn btn-warning" onclick="document.getElementById('import-backup-file').click()">📥 导入数据恢复</button>
+                            <input type="file" id="import-backup-file" accept=".json" style="display:none" onchange="importUserData(event)">
+                        </div>
+                        <div class="backup-tip">
+                            ⚠️ 导入将<strong>覆盖</strong>当前所有数据，请确保已导出备份。建议在导入前先执行「导出数据备份」。
+                            导入的 JSON 文件格式需与导出一致。
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+            `;
+
+            area.innerHTML = html;
+        }
+
+        let selectedAvatarColor = '';
+
+        function selectAvatarColor(color) {
+            selectedAvatarColor = color;
+            document.querySelectorAll('.color-option').forEach(el => {
+                el.classList.toggle('active', el.style.background === color);
+            });
+        }
+
+        async function updateProfile() {
+            if (!currentUser || !currentUserId) { alert('未登录'); return; }
+
+            const nickname = document.getElementById('profile-nickname')?.value?.trim() || '';
+            const bio = document.getElementById('profile-bio')?.value?.trim() || '';
+            const defaultWarehouse = document.getElementById('profile-default-warehouse')?.value || '新库房';
+            const newPwd = document.getElementById('profile-new-pwd')?.value || '';
+            const confirmPwd = document.getElementById('profile-confirm-pwd')?.value || '';
+            const avatarColor = selectedAvatarColor || currentUser.avatar_color || '#e94560';
+
+            if (newPwd || confirmPwd) {
+                if (newPwd !== confirmPwd) {
+                    alert('两次密码输入不一致');
+                    return;
+                }
+                if (!/^(?=.*[a-z])(?=.*\d)[a-z\d]{6,}$/.test(newPwd)) {
+                    alert('密码需6位以上，数字+小写字母组合');
+                    return;
+                }
+            }
+
+            try {
+                const updates = {
+                    nickname: nickname,
+                    bio: bio,
+                    default_warehouse: defaultWarehouse,
+                    avatar_color: avatarColor,
+                };
+                if (newPwd) {
+                    updates.password = newPwd;
+                }
+
+                const { error } = await supabase
+                    .from('users')
+                    .update(updates)
+                    .eq('id', currentUserId);
+
+                if (error) throw error;
+
+                Object.assign(currentUser, updates);
+                if (newPwd) currentUser.password = newPwd;
+
+                alert('✅ 资料更新成功！');
+                renderProfile();
+            } catch (err) {
+                console.error('更新资料失败:', err);
+                alert('更新失败: ' + (err.message || '未知错误'));
+            }
+        }
+
+        async function logout() {
+            if (!confirm('确定要退出登录吗？')) return;
+            currentUserId = null;
+            currentUser = null;
+            appData = {};
+            document.getElementById('main-system').style.display = 'none';
+            document.getElementById('auth-screen').style.display = 'flex';
+            sessionStorage.setItem('gorenje_remember', '0');
+            if (subscriptionChannel) {
+                subscriptionChannel.unsubscribe();
+                subscriptionChannel = null;
+            }
+        }
+
+        // ===================================================================
+        // 数据导出/导入
+        // ===================================================================
+        function exportUserData() {
+            if (!currentUserId) { alert('请先登录'); return; }
+            const exportData = {
+                version: '2.0.1',
+                exportedAt: new Date().toISOString(),
+                user: currentUser.username,
+                data: appData
+            };
+            const dataStr = JSON.stringify(exportData, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            const dateStr = new Date().toISOString().slice(0, 10);
+            link.download = `gorenje_backup_${dateStr}.json`;
+            link.click();
+            URL.revokeObjectURL(link.href);
+            alert('✅ 数据备份已导出！');
+        }
+
+      // ===================================================================
+// 数据导入（支持多种 JSON 格式）
+// ===================================================================
+// ===================================================================
+// 数据导入（支持老版本 JSON，保持顺序）
+// ===================================================================
+// ===================================================================
+// 数据导入（完全保持原有顺序）
+// ===================================================================
+async function importUserData(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (!confirm('⚠️ 导入将覆盖当前所有数据，确定继续吗？')) {
+        event.target.value = '';
+        return;
+    }
+
+    try {
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+            try {
+                const text = e.target.result;
+                console.log('📄 文件内容预览（前200字符）:', text.substring(0, 200));
+                
+                let imported = JSON.parse(text);
+                console.log('📦 解析后的数据:', imported);
+                console.log('📄 顶层 keys:', Object.keys(imported));
+
+                // 尝试找到数据
+                let dataToImport = null;
+                let dataSource = '';
+
+                if (imported.data && typeof imported.data === 'object') {
+                    dataToImport = imported.data;
+                    dataSource = 'data 字段';
+                    console.log('✅ 使用 data 字段');
+                } else if (imported.purchaseIn || imported.retailOrder || imported.users) {
+                    dataToImport = imported;
+                    dataSource = '直接数据';
+                    console.log('✅ 使用直接数据');
+                } else {
+                    for (const key of Object.keys(imported)) {
+                        const val = imported[key];
+                        if (Array.isArray(val) && val.length > 0) {
+                            dataToImport = imported;
+                            dataSource = '包含数组数据';
+                            console.log(`✅ 找到数组数据: ${key}`);
+                            break;
+                        }
+                    }
+                }
+
+                if (!dataToImport) {
+                    alert('❌ 无法识别数据格式');
+                    return;
+                }
+
+                console.log('📦 数据源:', dataSource);
+                console.log('📦 数据 keys:', Object.keys(dataToImport));
+
+                // 字段映射
+                const fieldMap = {
+                    'orderNo': 'order_no',
+                    'orderSource': 'order_source',
+                    'orderDate': 'order_date',
+                    'purchaseDate': 'purchase_date',
+                    'receiveDate': 'receive_date',
+                    'displayDate': 'display_date',
+                    'goodsName': 'goods_name',
+                    'sellPrice': 'sell_price',
+                    'retailPrice': 'retail_price',
+                    'payMethod': 'pay_method',
+                    'payAmount': 'pay_amount',
+                    'hasBalance': 'has_balance',
+                    'costPrice': 'cost_price',
+                    'posOwner': 'pos_owner',
+                    'posAmount': 'pos_amount',
+                    'subsidyAmount': 'subsidy_amount',
+                    'posDate': 'pos_date',
+                    'invoiceAmount': 'invoice_amount',
+                    'invoiceDate': 'invoice_date',
+                    'salesRecorded': 'sales_recorded',
+                    'installDate': 'install_date',
+                    'installRecorded': 'install_recorded',
+                    'salesRecordDate': 'sales_record_date',
+                    'storeAddress': 'store_address',
+                    'empNo': 'emp_no',
+                    'bookStock': 'book_stock',
+                    'salesOrder': 'sales_order',
+                    'availableStock': 'available_stock',
+                    'defaultWarehouse': 'default_warehouse',
+                    'avatarColor': 'avatar_color',
+                    'registerTime': 'register_time',
+                };
+
+                function convertFields(obj) {
+                    if (!obj || typeof obj !== 'object') return obj;
+                    const newObj = {};
+                    for (const [key, value] of Object.entries(obj)) {
+                        if (key === 'id' || key === 'user_id' || key === 'created_at') continue;
+                        const newKey = fieldMap[key] || key;
+                        newObj[newKey] = value;
+                    }
+                    return newObj;
+                }
+
+                // ============================================================
+                // 按指定顺序导入（保持原顺序，逐条插入）
+                // ============================================================
+                const tableOrder = [
+                    { oldKey: 'purchaseIn', tableName: 'purchase_in' },
+                    { oldKey: 'purchaseExchange', tableName: 'purchase_exchange' },
+                    { oldKey: 'purchaseReturn', tableName: 'purchase_return' },
+                    { oldKey: 'retailOrder', tableName: 'retail_order' },
+                    { oldKey: 'retailSell', tableName: 'retail_sell' },
+                    { oldKey: 'retailExchange', tableName: 'retail_exchange' },
+                    { oldKey: 'retailReturn', tableName: 'retail_return' },
+                    { oldKey: 'sampleDisplay', tableName: 'sample_display' },
+                    { oldKey: 'sampleSell', tableName: 'sample_sell' },
+                    { oldKey: 'productInfo', tableName: 'product_info' },
+                    { oldKey: 'employeeInfo', tableName: 'employee_info' },
+                    { oldKey: 'supplierInfo', tableName: 'supplier_info' },
+                    { oldKey: 'stock', tableName: 'stock' }
+                ];
+
+                let totalImported = 0;
+                let importedTables = [];
+
+                // 按顺序导入每个表
+                for (const { oldKey, tableName } of tableOrder) {
+                    let records = dataToImport[oldKey] || [];
+                    if (!Array.isArray(records)) {
+                        if (typeof records === 'object' && records !== null) {
+                            records = Object.values(records);
+                        } else {
+                            records = [];
+                        }
+                    }
+                    if (records.length === 0) continue;
+
+                    console.log(`📥 导入 ${oldKey}: ${records.length} 条记录`);
+                    importedTables.push(`${oldKey}(${records.length})`);
+
+                    // 删除该表当前用户的所有数据
+                    await supabase
+                        .from(tableName)
+                        .delete()
+                        .eq('user_id', currentUserId);
+
+                    // 逐条插入，保持原有顺序（先转换所有记录）
+                    const convertedRecords = records.map(record => {
+                        const converted = convertFields(record);
+                        if (currentUserId) converted.user_id = currentUserId;
+                        return converted;
+                    });
+
+                    // 按顺序逐条插入（使用 for 循环保证顺序）
+                    for (let i = 0; i < convertedRecords.length; i++) {
+                        const record = convertedRecords[i];
+                        try {
+                            const { error } = await supabase
+                                .from(tableName)
+                                .insert([record]);
+                            if (error) {
+                                console.error(`导入第 ${i+1} 条失败:`, error);
+                            } else {
+                                totalImported++;
+                            }
+                        } catch (err) {
+                            console.error(`导入第 ${i+1} 条异常:`, err);
+                        }
+                        // 每10条显示进度
+                        if ((i + 1) % 10 === 0) {
+                            console.log(`  已导入 ${i+1}/${convertedRecords.length} 条`);
+                        }
+                    }
+                    console.log(`  ✅ ${oldKey} 导入完成`);
+                }
+
+                // 处理 users（放在最后）
+                if (dataToImport.users) {
+                    let userRecords = dataToImport.users;
+                    if (!Array.isArray(userRecords)) {
+                        userRecords = Object.values(userRecords);
+                    }
+                    console.log(`📥 导入 users: ${userRecords.length} 条记录`);
+                    
+                    // 逐条插入
+                    for (let i = 0; i < userRecords.length; i++) {
+                        const user = userRecords[i];
+                        const converted = convertFields(user);
+                        if (converted.username) {
+                            const { data: existing } = await supabase
+                                .from('users')
+                                .select('id')
+                                .eq('username', converted.username)
+                                .maybeSingle();
+                            
+                            if (!existing) {
+                                const newUser = {
+                                    username: converted.username,
+                                    email: converted.email || converted.username + '@import.com',
+                                    password: 'imported123',
+                                    nickname: converted.nickname || '',
+                                    bio: converted.bio || '',
+                                    default_warehouse: converted.default_warehouse || '新库房',
+                                    avatar_color: converted.avatar_color || '#e94560',
+                                    register_time: converted.register_time || new Date().toLocaleString()
+                                };
+                                await supabase
+                                    .from('users')
+                                    .insert([newUser]);
+                            }
+                        }
+                    }
+                }
+
+                // 重新加载数据
+                await loadAllUserData();
+                await updateStock();
+                
+                alert(`✅ 数据恢复成功！\n导入表: ${importedTables.join(', ')}\n总记录数: ${totalImported} 条`);
+                console.log('✅ 导入完成，顺序已保持');
+                
+                if (currentPage) showPage(currentPage);
+                else showPage('dashboard');
+
+            } catch (parseErr) {
+                console.error('解析失败:', parseErr);
+                alert('❌ 解析失败: ' + parseErr.message);
+            }
+        };
+        reader.readAsText(file);
+    } catch (err) {
+        console.error('读取文件失败:', err);
+        alert('❌ 读取文件失败: ' + err.message);
+    }
+    event.target.value = '';
+}
+
+        // ===================================================================
+        // 辅助函数
+        // ===================================================================
+        function getProductBrands() {
+            const products = appData.productInfo || [];
+            const brands = [...new Set(products.map(p => p.brand).filter(Boolean))];
+            return brands;
+        }
+
+        function getProductNamesByBrand(brand) {
+            const products = appData.productInfo || [];
+            const names = [...new Set(products.filter(p => p.brand === brand).map(p => p.goods_name || p.goodsName).filter(
+                Boolean))];
+            return names;
+        }
+
+        function getProductModelsByBrandName(brand, name) {
+            const products = appData.productInfo || [];
+            const models = [...new Set(products.filter(p => p.brand === brand && (p.goods_name === name || p.goodsName ===
+                name)).map(p => p.model).filter(Boolean))];
+            return models;
+        }
+
+        function getEmployeeNames() {
+            const emps = appData.employeeInfo || [];
+            return emps.map(e => e.name).filter(Boolean);
+        }
+
+        function getSupplierNames() {
+            const suppliers = appData.supplierInfo || [];
+            return suppliers.map(s => s.name).filter(Boolean);
+        }
+
+        // ===================================================================
+        // 基础信息页面
+        // ===================================================================
+        function renderBaseInfoPage(page) {
+            const area = document.getElementById('content-area');
+            let title = '',
+                dataType = '',
+                fields = [],
+                labelMap = {};
+
+            if (page === 'base-product') {
+                title = '商品信息';
+                dataType = 'productInfo';
+                fields = ['brand', 'goods_name', 'model', 'spec', 'unit', 'remark'];
+                labelMap = { brand: '商品品牌', goods_name: '商品名称', model: '商品型号', spec: '规格参数', unit: '单位',
+                remark: '备注' };
+            } else if (page === 'base-employee') {
+                title = '员工信息';
+                dataType = 'employeeInfo';
+                fields = ['name', 'emp_no', 'dept', 'position', 'phone'];
+                labelMap = { name: '姓名', emp_no: '工号', dept: '部门', position: '职位', phone: '电话' };
+            } else if (page === 'base-supplier') {
+                title = '供应商信息';
+                dataType = 'supplierInfo';
+                fields = ['name', 'contact', 'phone', 'address', 'remark'];
+                labelMap = { name: '供应商名称', contact: '联系人', phone: '电话', address: '地址', remark: '备注' };
+            }
+
+            let html = `
+            <div class="content-header">
+                <div class="page-title">${title}</div>
+                <div class="header-actions">
+                    <button class="btn btn-default" onclick="importBaseExcel('${dataType}')">导入Excel</button>
+                    <button class="btn btn-primary" onclick="openBaseAddForm('${dataType}')">+ 新增</button>
+                </div>
+            </div>
+            <div class="content-body">
+                <div class="toolbar">
+                    <input type="text" placeholder="搜索..." id="base-search-input" oninput="renderBaseTable('${dataType}')">
+                </div>
+                <div class="table-wrapper">
+                    <table class="data-table base-info-table" id="base-table">
+                        <thead><tr>
+                            ${fields.map(f => `<th>${labelMap[f]}</th>`).join('')}
+                            <th style="width:120px">操作</th>
+                        </tr></thead>
+                        <tbody id="base-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <input type="file" id="base-file-import" accept=".xls,.xlsx" style="display:none" onchange="handleBaseFileImport('${dataType}')">
+            `;
+
+            area.innerHTML = html;
+            renderBaseTable(dataType);
+        }
+
+        function renderBaseTable(dataType) {
+            const tbody = document.getElementById('base-tbody');
+            if (!tbody) return;
+            const list = appData[dataType] || [];
+            const keyword = document.getElementById('base-search-input')?.value?.trim() || '';
+
+            let filtered = list;
+            if (keyword) {
+                filtered = list.filter(row =>
+                    Object.values(row).some(v => String(v).toLowerCase().includes(keyword.toLowerCase()))
+                );
+            }
+
+            let html = '';
+            if (filtered.length === 0) {
+                html = `<tr><td colspan="10" class="empty-tip">暂无数据</td></tr>`;
+            } else {
+                filtered.forEach((row) => {
+                    const fields = Object.keys(row).filter(k => k !== 'id' && k !== 'user_id' && k !== 'created_at');
+                    html += '<tr>';
+                    fields.forEach(k => {
+                        html += `<td>${row[k] || ''}</td>`;
+                    });
+                    html += `<td>
+                        <button class="action-btn edit" onclick="editBaseRow('${dataType}', '${row.id}')">编辑</button>
+                        <button class="action-btn delete" onclick="deleteBaseRow('${dataType}', '${row.id}')">删除</button>
+                    </td>`;
+                    html += '</tr>';
+                });
+            }
+            tbody.innerHTML = html;
+        }
+
+        function openBaseAddForm(dataType) {
+            const fieldsMap = {
+                productInfo: ['brand', 'goods_name', 'model', 'spec', 'unit', 'remark'],
+                employeeInfo: ['name', 'emp_no', 'dept', 'position', 'phone'],
+                supplierInfo: ['name', 'contact', 'phone', 'address', 'remark']
+            };
+            const labelMap = {
+                brand: '商品品牌',
+                goods_name: '商品名称',
+                model: '商品型号',
+                spec: '规格参数',
+                unit: '单位',
+                remark: '备注',
+                name: '姓名',
+                emp_no: '工号',
+                dept: '部门',
+                position: '职位',
+                phone: '电话',
+                contact: '联系人',
+                address: '地址'
+            };
+            const fields = fieldsMap[dataType] || [];
+
+            let formHtml = '<div class="form-grid">';
+            fields.forEach(f => {
+                formHtml += `
+                    <div class="form-item">
+                        <label>${labelMap[f] || f}</label>
+                        <input id="bf_${f}" placeholder="请输入${labelMap[f] || f}">
+                    </div>
+                `;
+            });
+            formHtml += '</div>';
+
+            document.getElementById('modal-title').textContent = '新增' + (dataType === 'productInfo' ? '商品' : dataType ===
+                'employeeInfo' ? '员工' : '供应商');
+            document.getElementById('modal-body').innerHTML = formHtml;
+            document.getElementById('modal-footer').innerHTML = `
+                <button class="btn btn-default" onclick="closeModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveBaseRow('${dataType}')">保存</button>
+            `;
+            document.getElementById('modal-mask').classList.add('show');
+        }
+
+        async function saveBaseRow(dataType) {
+            const fieldsMap = {
+                productInfo: ['brand', 'goods_name', 'model', 'spec', 'unit', 'remark'],
+                employeeInfo: ['name', 'emp_no', 'dept', 'position', 'phone'],
+                supplierInfo: ['name', 'contact', 'phone', 'address', 'remark']
+            };
+            const fields = fieldsMap[dataType] || [];
+            const row = {};
+            fields.forEach(f => {
+                const el = document.getElementById(`bf_${f}`);
+                if (el) row[f] = el.value.trim();
+            });
+            const required = dataType === 'productInfo' ? ['brand', 'goods_name', 'model'] : dataType === 'employeeInfo' ? [
+                'name'
+            ] : ['name'];
+            for (const r of required) {
+                if (!row[r]) {
+                    alert(`请填写${r}`);
+                    return;
+                }
+            }
+
+            try {
+                const tableName = getTableName(dataType);
+                await insertRecord(tableName, row);
+                const fresh = await fetchUserData(tableName);
+                appData[dataType] = fresh || [];
+                closeModal();
+                renderBaseTable(dataType);
+            } catch (err) {
+                alert('保存失败: ' + (err.message || '未知错误'));
+            }
+        }
+
+        async function editBaseRow(dataType, id) {
+            const list = appData[dataType] || [];
+            const row = list.find(r => r.id === id);
+            if (!row) {
+                alert('记录不存在');
+                return;
+            }
+
+            const fieldsMap = {
+                productInfo: ['brand', 'goods_name', 'model', 'spec', 'unit', 'remark'],
+                employeeInfo: ['name', 'emp_no', 'dept', 'position', 'phone'],
+                supplierInfo: ['name', 'contact', 'phone', 'address', 'remark']
+            };
+            const labelMap = {
+                brand: '商品品牌',
+                goods_name: '商品名称',
+                model: '商品型号',
+                spec: '规格参数',
+                unit: '单位',
+                remark: '备注',
+                name: '姓名',
+                emp_no: '工号',
+                dept: '部门',
+                position: '职位',
+                phone: '电话',
+                contact: '联系人',
+                address: '地址'
+            };
+            const fields = fieldsMap[dataType] || [];
+
+            let formHtml = '<div class="form-grid">';
+            fields.forEach(f => {
+                formHtml += `
+                    <div class="form-item">
+                        <label>${labelMap[f] || f}</label>
+                        <input id="bf_${f}" value="${row[f] || ''}" placeholder="请输入${labelMap[f] || f}">
+                    </div>
+                `;
+            });
+            formHtml += '</div>';
+
+            document.getElementById('modal-title').textContent = '编辑' + (dataType === 'productInfo' ? '商品' : dataType ===
+                'employeeInfo' ? '员工' : '供应商');
+            document.getElementById('modal-body').innerHTML = formHtml;
+            document.getElementById('modal-footer').innerHTML = `
+                <button class="btn btn-default" onclick="closeModal()">取消</button>
+                <button class="btn btn-primary" onclick="updateBaseRow('${dataType}', '${id}')">更新</button>
+            `;
+            document.getElementById('modal-mask').classList.add('show');
+        }
+
+        async function updateBaseRow(dataType, id) {
+            const fieldsMap = {
+                productInfo: ['brand', 'goods_name', 'model', 'spec', 'unit', 'remark'],
+                employeeInfo: ['name', 'emp_no', 'dept', 'position', 'phone'],
+                supplierInfo: ['name', 'contact', 'phone', 'address', 'remark']
+            };
+            const fields = fieldsMap[dataType] || [];
+            const row = {};
+            fields.forEach(f => {
+                const el = document.getElementById(`bf_${f}`);
+                if (el) row[f] = el.value.trim();
+            });
+            const required = dataType === 'productInfo' ? ['brand', 'goods_name', 'model'] : dataType === 'employeeInfo' ? [
+                'name'
+            ] : ['name'];
+            for (const r of required) {
+                if (!row[r]) {
+                    alert(`请填写${r}`);
+                    return;
+                }
+            }
+
+            try {
+                const tableName = getTableName(dataType);
+                await updateRecord(tableName, id, row);
+                const fresh = await fetchUserData(tableName);
+                appData[dataType] = fresh || [];
+                closeModal();
+                renderBaseTable(dataType);
+            } catch (err) {
+                alert('更新失败: ' + (err.message || '未知错误'));
+            }
+        }
+
+        async function deleteBaseRow(dataType, id) {
+            if (!confirm('确定删除？')) return;
+            try {
+                const tableName = getTableName(dataType);
+                await deleteRecord(tableName, id);
+                const fresh = await fetchUserData(tableName);
+                appData[dataType] = fresh || [];
+                renderBaseTable(dataType);
+            } catch (err) {
+                alert('删除失败: ' + (err.message || '未知错误'));
+            }
+        }
+
+        function importBaseExcel(dataType) {
+            document.getElementById('base-file-import').click();
+        }
+
+        async function handleBaseFileImport(dataType) {
+            const fileInput = document.getElementById('base-file-import');
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                const json = XLSX.utils.sheet_to_json(sheet);
+
+                let colMap = {};
+                if (dataType === 'productInfo') {
+                    colMap = { '商品品牌': 'brand', '商品名称': 'goods_name', '商品型号': 'model', '规格参数': 'spec', '单位': 'unit',
+                        '备注': 'remark' };
+                } else if (dataType === 'employeeInfo') {
+                    colMap = { '姓名': 'name', '工号': 'emp_no', '部门': 'dept', '职位': 'position', '电话': 'phone' };
+                } else if (dataType === 'supplierInfo') {
+                    colMap = { '供应商名称': 'name', '联系人': 'contact', '电话': 'phone', '地址': 'address', '备注': 'remark' };
+                }
+
+                let imported = 0;
+                const records = [];
+                json.forEach(row => {
+                    const mapped = {};
+                    Object.keys(row).forEach(k => {
+                        const key = colMap[k];
+                        if (key) mapped[key] = row[k];
+                    });
+                    let required = [];
+                    if (dataType === 'productInfo') required = ['brand', 'goods_name', 'model'];
+                    else if (dataType === 'employeeInfo') required = ['name'];
+                    else if (dataType === 'supplierInfo') required = ['name'];
+                    let valid = true;
+                    for (const r of required) {
+                        if (!mapped[r]) { valid = false; break; }
+                    }
+                    if (!valid) return;
+                    records.push(mapped);
+                    imported++;
+                });
+
+                if (records.length === 0) {
+                    alert('没有有效数据可导入，请检查列名是否匹配');
+                    fileInput.value = '';
+                    return;
+                }
+
+                try {
+                    const tableName = getTableName(dataType);
+                    await supabase.from(tableName).delete().eq('user_id', currentUserId);
+                    await insertRecords(tableName, records);
+                    const fresh = await fetchUserData(tableName);
+                    appData[dataType] = fresh || [];
+                    renderBaseTable(dataType);
+                    alert(`成功导入 ${imported} 条记录`);
+                } catch (err) {
+                    alert('导入失败: ' + (err.message || '未知错误'));
+                }
+                fileInput.value = '';
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // ===================================================================
+        // 数据操作函数
+        // ===================================================================
+        function getTableName(dataType) {
+            const map = {
+                purchaseIn: 'purchase_in',
+                purchaseExchange: 'purchase_exchange',
+                purchaseReturn: 'purchase_return',
+                retailOrder: 'retail_order',
+                retailSell: 'retail_sell',
+                retailExchange: 'retail_exchange',
+                retailReturn: 'retail_return',
+                sampleDisplay: 'sample_display',
+                sampleSell: 'sample_sell',
+                stock: 'stock',
+                productInfo: 'product_info',
+                employeeInfo: 'employee_info',
+                supplierInfo: 'supplier_info'
+            };
+            return map[dataType] || dataType;
+        }
+
+        async function insertRecord(tableName, record) {
+            if (!currentUserId) return null;
+            const payload = { ...record, user_id: currentUserId };
+            const { data, error } = await supabase.from(tableName).insert([payload]).select();
+            if (error) throw error;
+            return data ? data[0] : null;
+        }
+
+        async function insertRecords(tableName, records) {
+            if (!currentUserId || records.length === 0) return [];
+            const payloads = records.map(r => ({ ...r, user_id: currentUserId }));
+            const { data, error } = await supabase.from(tableName).insert(payloads).select();
+            if (error) throw error;
+            return data || [];
+        }
+
+        async function updateRecord(tableName, id, record) {
+            const { data, error } = await supabase
+                .from(tableName)
+                .update(record)
+                .eq('id', id)
+                .eq('user_id', currentUserId)
+                .select();
+            if (error) throw error;
+            return data ? data[0] : null;
+        }
+
+        async function deleteRecord(tableName, id) {
+            const { error } = await supabase
+                .from(tableName)
+                .delete()
+                .eq('id', id)
+                .eq('user_id', currentUserId);
+            if (error) throw error;
+            return true;
+        }
+
+        async function deleteRecords(tableName, ids) {
+            const { error } = await supabase
+                .from(tableName)
+                .delete()
+                .in('id', ids)
+                .eq('user_id', currentUserId);
+            if (error) throw error;
+            return true;
+        }
+
+        function getFilteredData(dataType) {
+            let data = appData[dataType] || [];
+
+            const keyword = document.getElementById('search-input')?.value || '';
+            if (keyword) {
+                data = data.filter(row =>
+                    Object.values(row).some(v => String(v).toLowerCase().includes(keyword.toLowerCase()))
+                );
+            }
+
+            const startDate = document.getElementById('filter-start-date')?.value || '';
+            const endDate = document.getElementById('filter-end-date')?.value || '';
+
+            let dateField = '';
+            if (dataType === 'purchaseIn' || dataType === 'purchaseExchange' || dataType === 'purchaseReturn') {
+                dateField = 'purchase_date';
+            } else if (dataType === 'retailOrder' || dataType === 'retailSell' || dataType === 'retailExchange' ||
+                dataType === 'retailReturn' || dataType === 'sampleSell') {
+                dateField = 'order_date';
+            } else if (dataType === 'sampleDisplay') {
+                dateField = 'display_date';
+            }
+
+            if (dateField && (startDate || endDate)) {
+                data = data.filter(row => {
+                    const d = row[dateField] || '';
+                    if (startDate && d < startDate) return false;
+                    if (endDate && d > endDate) return false;
+                    return true;
+                });
+            }
+
+            const isRetail = dataType.includes('retail') || dataType === 'sampleSell';
+            if (isRetail) {
+                const phone = document.getElementById('filter-phone')?.value?.trim() || '';
+                const customer = document.getElementById('filter-customer')?.value?.trim() || '';
+                const brand = document.getElementById('filter-brand')?.value?.trim() || '';
+                const model = document.getElementById('filter-model')?.value?.trim() || '';
+                const channel = document.getElementById('filter-channel')?.value?.trim() || '';
+
+                if (phone) data = data.filter(row => String(row.phone || '').includes(phone));
+                if (customer) data = data.filter(row => String(row.customer || '').toLowerCase().includes(customer
+                    .toLowerCase()));
+                if (brand) data = data.filter(row => String(row.brand || '').toLowerCase().includes(brand.toLowerCase()));
+                if (model) data = data.filter(row => String(row.model || '').toLowerCase().includes(model.toLowerCase()));
+                if (channel) data = data.filter(row => String(row.channel || '').toLowerCase().includes(channel
+                    .toLowerCase()));
+            }
+
+            const whFilter = document.getElementById('warehouse-filter');
+            if (whFilter && whFilter.value) {
+                data = data.filter(row => (row.warehouse || '') === whFilter.value);
+            }
+
+            if (isRetail && repeatFilterMode) {
+                const countMap = {};
+                data.forEach(row => {
+                    const key = row.order_no || row.orderNo || '';
+                    if (key) {
+                        countMap[key] = (countMap[key] || 0) + 1;
+                    }
+                });
+                data = data.filter(row => {
+                    const key = row.order_no || row.orderNo || '';
+                    return key && countMap[key] > 1;
+                });
+            }
+
+            return data;
+        }
+
+        // ===================================================================
+        // 渲染内容
+        // ===================================================================
+        function renderContent(title, dataType) {
+            const area = document.getElementById('content-area');
+            const isRetail = dataType.includes('retail') || dataType === 'sampleSell';
+            const isPurchase = dataType.includes('purchase');
+            const isStock = dataType === 'stock';
+
+            let dateFilterHtml = `
+                <input type="date" id="filter-start-date" placeholder="开始日期" onchange="renderTable('${dataType}')">
+                <input type="date" id="filter-end-date" placeholder="结束日期" onchange="renderTable('${dataType}')">
+            `;
+
+            let retailFilterHtml = '';
+            let extraBtn = '';
+            if (isRetail) {
+                retailFilterHtml = `
+                    <input type="text" id="filter-phone" placeholder="手机号" oninput="renderTable('${dataType}')">
+                    <input type="text" id="filter-customer" placeholder="客户姓名" oninput="renderTable('${dataType}')">
+                    <input type="text" id="filter-brand" placeholder="商品品牌" oninput="renderTable('${dataType}')">
+                    <input type="text" id="filter-model" placeholder="商品型号" oninput="renderTable('${dataType}')">
+                    <input type="text" id="filter-channel" placeholder="销售渠道" oninput="renderTable('${dataType}')">
+                `;
+                extraBtn =
+                    `<button class="btn btn-warning" onclick="toggleRepeatFilter('${dataType}')" id="repeat-filter-btn">🔍 筛重</button>`;
+            }
+
+            const batchDeleteBtn = `
+                <button class="btn btn-danger" onclick="batchDelete('${dataType}')" id="batch-delete-btn" style="display:none;">🗑 批量删除</button>
+            `;
+
+            let html = `
+            <div class="content-header">
+                <div class="page-title">${title}</div>
+                <div class="header-actions">
+                    <button class="btn btn-default" onclick="importExcel('${dataType}')">导入Excel</button>
+                    <button class="btn btn-success" onclick="exportExcel('${dataType}')">导出汇总表</button>
+                    <button class="btn btn-primary" onclick="openAddForm('${dataType}')">+ 新增</button>
+                </div>
+            </div>
+            <div class="content-body">
+                <div class="toolbar">
+                    <input type="text" placeholder="搜索关键词..." id="search-input" oninput="renderTable('${dataType}')">
+                    ${dateFilterHtml}
+                    ${retailFilterHtml}
+                    ${extraBtn}
+                    ${batchDeleteBtn}
+                    <select id="warehouse-filter" onchange="renderTable('${dataType}')" style="display:${isPurchase||isStock||isRetail?'inline-block':'none'}">
+                        <option value="">全部仓库</option>
+                        <option value="新库房">新库房</option>
+                        <option value="老库房">老库房</option>
+                        <option value="无">无</option>
+                    </select>
+                </div>
+                <div class="table-wrapper" id="table-wrapper">
+                    <table class="data-table" id="data-table"></table>
+                </div>
+            </div>
+            <input type="file" id="file-import" accept=".xls,.xlsx" style="display:none" onchange="handleFileImport('${dataType}')">
+            `;
+
+            area.innerHTML = html;
+            renderTable(dataType);
+        }
+
+        // ===================================================================
+        // 表格列定义
+        // ===================================================================
+        function getTableColumns(dataType) {
+            const baseCols = {
+                purchaseIn: [
+                    { key: 'order_no', label: '单号' }, { key: 'supplier', label: '供应商' },
+                    { key: 'purchase_date', label: '采购日期' }, { key: 'receive_date', label: '收货日期' },
+                    { key: 'brand', label: '商品品牌' }, { key: 'goods_name', label: '商品名称' },
+                    { key: 'model', label: '商品型号' }, { key: 'quantity', label: '数量' },
+                    { key: 'price', label: '单价' }, { key: 'amount', label: '金额' },
+                    { key: 'invoiced', label: '是否已开票' }, { key: 'invoice_amount', label: '开票金额' },
+                    { key: 'invoice_date', label: '开票日期' }, { key: 'warehouse', label: '归属仓库' },
+                    { key: 'remark', label: '备注' }
+                ],
+                retailOrder: [
+                    { key: 'order_no', label: '单号' }, { key: 'order_source', label: '订单来源' },
+                    { key: 'order_date', label: '订单日期' }, { key: 'customer', label: '客户姓名' },
+                    { key: 'phone', label: '联系电话' }, { key: 'salesman', label: '销售人员' },
+                    { key: 'channel', label: '销售渠道' },
+                    { key: 'brand', label: '商品品牌' },
+                    { key: 'goods_name', label: '商品名称' },
+                    { key: 'model', label: '商品规格型号' }, { key: 'sell_price', label: '销售价格' },
+                    { key: 'retail_price', label: '零售价格' }, { key: 'discount', label: '折扣' },
+                    { key: 'pay_method', label: '收款方式' }, { key: 'pay_amount', label: '收款金额' },
+                    { key: 'has_balance', label: '是否有尾款' }, { key: 'subsidy', label: '是否国补' },
+                    { key: 'address', label: '安装地址' }, { key: 'installed', label: '是否安装' },
+                    { key: 'sales_recorded', label: '是否录销量' }, { key: 'invoiced', label: '是否开发票' },
+                    { key: 'cost_price', label: '进货价' }, { key: 'profit', label: '利润' },
+                    { key: 'pos_owner', label: 'POS机归属' },
+                    { key: 'pos_amount', label: 'POS机交易金额' },
+                    { key: 'subsidy_amount', label: '补贴金额' },
+                    { key: 'pos_date', label: 'POS机交易日期' },
+                    { key: 'warehouse', label: '归属仓库' },
+                    { key: 'remark', label: '备注' }
+                ],
+                stock: [
+                    { key: 'brand', label: '商品品牌' }, { key: 'goods_name', label: '商品名称' },
+                    { key: 'model', label: '商品型号' }, { key: 'book_stock', label: '账面库存' },
+                    { key: 'sales_order', label: '销售订货' }, { key: 'available_stock', label: '可用库存' },
+                    { key: 'warehouse', label: '归属仓库' }
+                ],
+                sampleDisplay: [
+                    { key: 'order_no', label: '单号' }, { key: 'store_address', label: '上样门店地址' },
+                    { key: 'display_date', label: '上样日期' }, { key: 'brand', label: '商品品牌' },
+                    { key: 'goods_name', label: '商品名称' }, { key: 'model', label: '商品型号' },
+                    { key: 'quantity', label: '数量' }, { key: 'price', label: '价格' },
+                    { key: 'amount', label: '金额' }, { key: 'manager', label: '负责人' }
+                ],
+                sampleSell: [
+                    { key: 'order_no', label: '单号' }, { key: 'order_source', label: '订单来源' },
+                    { key: 'order_date', label: '订单日期' }, { key: 'customer', label: '客户姓名' },
+                    { key: 'phone', label: '联系电话' }, { key: 'salesman', label: '销售人员' },
+                    { key: 'channel', label: '销售渠道' }, { key: 'goods_name', label: '商品名称' },
+                    { key: 'model', label: '商品规格型号' }, { key: 'sell_price', label: '销售价格' },
+                    { key: 'retail_price', label: '零售价格' }, { key: 'discount', label: '折扣' },
+                    { key: 'pay_method', label: '收款方式' }, { key: 'pay_amount', label: '收款金额' },
+                    { key: 'has_balance', label: '是否有尾款' }, { key: 'subsidy', label: '是否国补' },
+                    { key: 'address', label: '安装地址' }, { key: 'installed', label: '是否安装' },
+                    { key: 'sales_recorded', label: '是否录销量' }, { key: 'invoiced', label: '是否开发票' },
+                    { key: 'cost_price', label: '进货价' }, { key: 'profit', label: '利润' },
+                    { key: 'warehouse', label: '归属仓库' },
+                    { key: 'remark', label: '备注' }
+                ]
+            };
+
+            const map = {
+                purchaseIn: 'purchaseIn',
+                purchaseExchange: 'purchaseIn',
+                purchaseReturn: 'purchaseIn',
+                retailOrder: 'retailOrder',
+                retailSell: 'retailOrder',
+                retailExchange: 'retailOrder',
+                retailReturn: 'retailOrder',
+                stock: 'stock',
+                sampleDisplay: 'sampleDisplay',
+                sampleSell: 'sampleSell'
+            };
+            return baseCols[map[dataType]] || [];
+        }
+
+        // ===================================================================
+        // 渲染表格
+        // ===================================================================
+        function renderTable(dataType) {
+            const table = document.getElementById('data-table');
+            if (!table) return;
+            const cols = getTableColumns(dataType);
+            const data = getFilteredData(dataType);
+
+            const isStock = dataType === 'stock';
+
+            const batchBtn = document.getElementById('batch-delete-btn');
+            if (batchBtn) {
+                batchBtn.style.display = data.length > 0 ? 'inline-block' : 'none';
+            }
+
+            let html = '<thead><tr>';
+            html +=
+                `<th style="width:30px"><input type="checkbox" class="select-all-checkbox" onchange="toggleAllCheckboxes(this)"></th>`;
+            cols.forEach(c => html += `<th>${c.label}</th>`);
+            html += '<th style="width:100px">操作</th></tr></thead><tbody>';
+
+            if (data.length === 0) {
+                html += `<tr><td colspan="${cols.length + 2}" class="empty-tip">暂无数据，请新增或导入</td></tr>`;
+            } else {
+                data.forEach((row) => {
+                    const rowId = row.id;
+
+                    html += '<tr>';
+                    html +=
+                        `<td><input type="checkbox" class="row-checkbox" data-id="${rowId}" onchange="updateBatchDeleteBtn()"></td>`;
+                    cols.forEach(c => {
+                        let val = row[c.key] !== undefined && row[c.key] !== null ? row[c.key] : '';
+                        if (isStock && c.key === 'sales_order' && val > 0) {
+                            const goodsName = row.goods_name || row.goodsName || '';
+                            const brand = row.brand || '';
+                            const model = row.model || '';
+                            val =
+                                `<span class="clickable-number" onclick="jumpToRetailByProduct('${brand}','${goodsName}','${model}')">${val}</span>`;
+                        }
+                        html += `<td>${val}</td>`;
+                    });
+                    html += `<td>
+                        <button class="action-btn edit" onclick="editRow('${dataType}', '${rowId}')">编辑</button>
+                        <button class="action-btn delete" onclick="deleteRow('${dataType}', '${rowId}')">删除</button>
+                    </td>`;
+                    html += '</tr>';
+                });
+            }
+            html += '</tbody>';
+            table.innerHTML = html;
+        }
+
+        function toggleAllCheckboxes(master) {
+            const checkboxes = document.querySelectorAll('.row-checkbox');
+            checkboxes.forEach(cb => cb.checked = master.checked);
+            updateBatchDeleteBtn();
+        }
+
+        function updateBatchDeleteBtn() {
+            const checked = document.querySelectorAll('.row-checkbox:checked').length;
+            const btn = document.getElementById('batch-delete-btn');
+            if (btn) {
+                btn.style.display = checked > 0 ? 'inline-block' : 'none';
+                btn.textContent = `🗑 批量删除 (${checked})`;
+            }
+        }
+
+        function jumpToRetailByProduct(brand, goodsName, model) {
+            showPage('retail-order');
+            setTimeout(() => {
+                const brandInput = document.getElementById('filter-brand');
+                const searchInput = document.getElementById('search-input');
+                const modelInput = document.getElementById('filter-model');
+                if (brandInput) brandInput.value = brand || '';
+                if (searchInput) searchInput.value = goodsName || '';
+                if (modelInput) modelInput.value = model || '';
+                renderTable('retailOrder');
+                const toolbar = document.querySelector('.toolbar');
+                if (toolbar) {
+                    toolbar.style.border = '2px solid #e94560';
+                    toolbar.style.borderRadius = '6px';
+                    setTimeout(() => { toolbar.style.border = ''; }, 3000);
+                }
+            }, 300);
+        }
+
+        // ===================================================================
+        // 表单构建
+        // ===================================================================
+        function genOrderNo(prefix, dataType) {
+            const list = appData[dataType] || [];
+            const num = list.length.toString().padStart(4, '0');
+            return prefix + num;
+        }
+
+        function buildDatalistOptions(options) {
+            return options.map(opt => `<option value="${opt}">`).join('');
+        }
+
+        function buildPurchaseForm(dataType) {
+            const suppliers = getSupplierNames();
+            const brands = getProductBrands();
+            const brandOpts = buildDatalistOptions(brands);
+            return `
+            <div class="form-grid">
+                <div class="form-item"><label>单号</label><input id="f_order_no" readonly></div>
+                <div class="form-item"><label>供应商</label>
+                    <input list="f_supplier_list" id="f_supplier" placeholder="请输入或选择">
+                    <datalist id="f_supplier_list">${buildDatalistOptions(suppliers)}</datalist>
+                </div>
+                <div class="form-item"><label>采购日期</label><input id="f_purchase_date" type="date"></div>
+                <div class="form-item"><label>收货日期</label><input id="f_receive_date" type="date"></div>
+                <div class="form-item"><label>商品品牌</label>
+                    <input list="f_brand_list" id="f_brand" placeholder="请输入或选择" oninput="onBrandInput('purchase')">
+                    <datalist id="f_brand_list">${brandOpts}</datalist>
+                </div>
+                <div class="form-item"><label>商品名称</label>
+                    <input list="f_goods_name_list" id="f_goods_name" placeholder="请输入或选择" oninput="onNameInput('purchase')">
+                    <datalist id="f_goods_name_list"></datalist>
+                </div>
+                <div class="form-item"><label>商品型号</label>
+                    <input list="f_model_list" id="f_model" placeholder="请输入或选择">
+                    <datalist id="f_model_list"></datalist>
+                </div>
+                <div class="form-item"><label>数量</label><input id="f_quantity" type="number"></div>
+                <div class="form-item"><label>单价</label><input id="f_price" type="number" step="0.01"></div>
+                <div class="form-item"><label>金额</label><input id="f_amount" readonly></div>
+                <div class="form-item"><label>是否已开票</label>
+                    <select id="f_invoiced"><option value="否">否</option><option value="是">是</option></select>
+                </div>
+                <div class="form-item"><label>开票金额</label><input id="f_invoice_amount" type="number" step="0.01"></div>
+                <div class="form-item"><label>开票日期</label><input id="f_invoice_date" type="date"></div>
+                <div class="form-item"><label>归属仓库</label>
+                    <select id="f_warehouse">
+                        <option value="新库房">新库房</option>
+                        <option value="老库房">老库房</option>
+                        <option value="无">无</option>
+                    </select>
+                </div>
+                <div class="form-item full"><label>备注</label><textarea id="f_remark" rows="2"></textarea></div>
+            </div>`;
+        }
+
+        function buildRetailForm(dataType) {
+            const brands = getProductBrands();
+            const employees = getEmployeeNames();
+            const brandOpts = buildDatalistOptions(brands);
+            const empOpts = buildDatalistOptions(employees);
+
+            return `
+            <div class="form-grid">
+                <div class="form-item"><label>单号</label><input id="f_order_no" readonly></div>
+                <div class="form-item"><label>订单来源</label><input id="f_order_source"></div>
+                <div class="form-item"><label>订单日期</label><input id="f_order_date" type="date"></div>
+                <div class="form-item"><label>客户姓名</label><input id="f_customer"></div>
+                <div class="form-item"><label>联系电话</label><input id="f_phone" placeholder="输入手机号自动带出历史信息" onblur="autoFillByPhone()"></div>
+                <div class="form-item" style="grid-column:span 1;position:relative;">
+                    <div class="history-order-list" id="history-order-list"></div>
+                </div>
+                <div class="form-item"><label>销售人员</label>
+                    <input list="f_salesman_list" id="f_salesman" placeholder="请输入或选择">
+                    <datalist id="f_salesman_list">${empOpts}</datalist>
+                </div>
+                <div class="form-item"><label>销售渠道</label>
+                    <input id="f_channel" placeholder="输入销售渠道">
+                </div>
+                <div class="form-item"><label>商品品牌</label>
+                    <input list="f_brand_list" id="f_brand" placeholder="请输入或选择" oninput="onBrandInput('retail')">
+                    <datalist id="f_brand_list">${brandOpts}</datalist>
+                </div>
+                <div class="form-item"><label>商品名称</label>
+                    <input list="f_goods_name_list" id="f_goods_name" placeholder="请输入或选择" oninput="onNameInput('retail')">
+                    <datalist id="f_goods_name_list"></datalist>
+                </div>
+                <div class="form-item"><label>商品规格型号</label>
+                    <input list="f_model_list" id="f_model" placeholder="请输入或选择">
+                    <datalist id="f_model_list"></datalist>
+                </div>
+                <div class="form-item"><label>销售价格</label><input id="f_sell_price" type="number" step="0.01"></div>
+                <div class="form-item"><label>零售价格</label><input id="f_retail_price" type="number" step="0.01"></div>
+                <div class="form-item"><label>折扣</label><input id="f_discount" readonly></div>
+                <div class="form-item"><label>收款方式</label>
+                    <select id="f_pay_method">
+                        <option value="佳洛顺驰">佳洛顺驰</option>
+                        <option value="洛高">洛高</option>
+                        <option value="商场">商场</option>
+                        <option value="个人">个人</option>
+                    </select>
+                </div>
+                <div class="form-item"><label>收款金额</label><input id="f_pay_amount" type="number" step="0.01"></div>
+                <div class="form-item"><label>是否有尾款</label><input id="f_has_balance" readonly></div>
+
+                <div class="form-item full">
+                    <div class="sub-fieldset">
+                        <legend>国补信息（虚线框内数据可导出）</legend>
+                        <div class="form-grid" style="grid-template-columns: repeat(4,1fr);">
+                            <div class="form-item"><label>POS机归属</label>
+                                <input id="f_pos_owner" placeholder="POS机归属">
+                            </div>
+                            <div class="form-item"><label>POS机交易金额</label><input id="f_pos_amount" type="number" step="0.01"></div>
+                            <div class="form-item"><label>补贴金额</label><input id="f_subsidy_amount" type="number" step="0.01"></div>
+                            <div class="form-item"><label>POS机交易日期</label><input id="f_pos_date" type="date"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-item full"><label>安装地址</label><input id="f_address"></div>
+
+                <div class="form-item">
+                    <label>是否安装</label>
+                    <select id="f_installed"><option value="否">否</option><option value="是">是</option></select>
+                </div>
+                <div class="form-item"><label>安装日期</label><input id="f_install_date" type="date"></div>
+                <div class="form-item"><label>安装是否录系统</label>
+                    <select id="f_install_recorded"><option value="否">否</option><option value="是">是</option></select>
+                </div>
+
+                <div class="form-item"><label>是否录销量</label>
+                    <select id="f_sales_recorded"><option value="否">否</option><option value="是">是</option></select>
+                </div>
+                <div class="form-item"><label>录销量日期</label><input id="f_sales_record_date" type="date"></div>
+                <div class="form-item"><label>是否开发票</label>
+                    <select id="f_invoiced"><option value="否">否</option><option value="是">是</option></select>
+                </div>
+                <div class="form-item"><label>开票日期</label><input id="f_invoice_date" type="date"></div>
+
+                <div class="form-item"><label>进货价</label><input id="f_cost_price" type="number" step="0.01"></div>
+                <div class="form-item"><label>利润</label><input id="f_profit" readonly></div>
+                <div class="form-item"></div>
+
+                <div class="form-item"><label>归属仓库</label>
+                    <select id="f_warehouse">
+                        <option value="新库房">新库房</option>
+                        <option value="老库房">老库房</option>
+                        <option value="无">无</option>
+                    </select>
+                </div>
+
+                <div class="form-item full"><label>备注</label><textarea id="f_remark" rows="2"></textarea></div>
+            </div>`;
+        }
+
+        function onBrandInput(type) {
+            const brandEl = document.getElementById('f_brand');
+            const nameEl = document.getElementById('f_goods_name');
+            const modelEl = document.getElementById('f_model');
+            if (!brandEl || !nameEl || !modelEl) return;
+            const brand = brandEl.value;
+            const names = getProductNamesByBrand(brand);
+            const nameDatalist = document.getElementById('f_goods_name_list');
+            if (nameDatalist) {
+                nameDatalist.innerHTML = buildDatalistOptions(names);
+            }
+            const modelDatalist = document.getElementById('f_model_list');
+            if (modelDatalist) modelDatalist.innerHTML = '';
+            if (nameEl.value) {
+                onNameInput(type);
+            }
+        }
+
+        function onNameInput(type) {
+            const brandEl = document.getElementById('f_brand');
+            const nameEl = document.getElementById('f_goods_name');
+            const modelEl = document.getElementById('f_model');
+            if (!brandEl || !nameEl || !modelEl) return;
+            const brand = brandEl.value;
+            const name = nameEl.value;
+            const models = getProductModelsByBrandName(brand, name);
+            const modelDatalist = document.getElementById('f_model_list');
+            if (modelDatalist) {
+                modelDatalist.innerHTML = buildDatalistOptions(models);
+            }
+        }
+
+        function buildSampleDisplayForm() {
+            const brands = getProductBrands();
+            const brandOpts = buildDatalistOptions(brands);
+            return `
+            <div class="form-grid">
+                <div class="form-item"><label>单号</label><input id="f_order_no" readonly></div>
+                <div class="form-item"><label>上样门店地址</label><input id="f_store_address"></div>
+                <div class="form-item"><label>上样日期</label><input id="f_display_date" type="date"></div>
+                <div class="form-item"><label>商品品牌</label>
+                    <input list="f_brand_list" id="f_brand" placeholder="请输入或选择" oninput="onBrandInput('sample')">
+                    <datalist id="f_brand_list">${brandOpts}</datalist>
+                </div>
+                <div class="form-item"><label>商品名称</label>
+                    <input list="f_goods_name_list" id="f_goods_name" placeholder="请输入或选择" oninput="onNameInput('sample')">
+                    <datalist id="f_goods_name_list"></datalist>
+                </div>
+                <div class="form-item"><label>商品型号</label>
+                    <input list="f_model_list" id="f_model" placeholder="请输入或选择">
+                    <datalist id="f_model_list"></datalist>
+                </div>
+                <div class="form-item"><label>数量</label><input id="f_quantity" type="number"></div>
+                <div class="form-item"><label>价格</label><input id="f_price" type="number" step="0.01"></div>
+                <div class="form-item"><label>金额</label><input id="f_amount" readonly></div>
+                <div class="form-item"><label>负责人</label><input id="f_manager"></div>
+            </div>`;
+        }
+
+        function buildSampleSellForm() {
+            const employees = getEmployeeNames();
+            const empOpts = buildDatalistOptions(employees);
+            return `
+            <div class="form-grid">
+                <div class="form-item"><label>单号</label><input id="f_order_no" readonly></div>
+                <div class="form-item"><label>订单来源</label><input id="f_order_source"></div>
+                <div class="form-item"><label>订单日期</label><input id="f_order_date" type="date"></div>
+                <div class="form-item"><label>客户姓名</label><input id="f_customer"></div>
+                <div class="form-item"><label>联系电话</label><input id="f_phone" placeholder="输入手机号自动带出历史信息" onblur="autoFillByPhone()"></div>
+                <div class="form-item" style="grid-column:span 1;position:relative;">
+                    <div class="history-order-list" id="history-order-list"></div>
+                </div>
+                <div class="form-item"><label>销售人员</label>
+                    <input list="f_salesman_list" id="f_salesman" placeholder="请输入或选择">
+                    <datalist id="f_salesman_list">${empOpts}</datalist>
+                </div>
+                <div class="form-item"><label>销售渠道</label>
+                    <input id="f_channel" placeholder="输入销售渠道">
+                </div>
+                <div class="form-item"><label>商品名称</label><input id="f_goods_name"></div>
+                <div class="form-item"><label>商品规格型号</label><input id="f_model"></div>
+                <div class="form-item"><label>销售价格</label><input id="f_sell_price" type="number" step="0.01"></div>
+                <div class="form-item"><label>零售价格</label><input id="f_retail_price" type="number" step="0.01"></div>
+                <div class="form-item"><label>折扣</label><input id="f_discount" readonly></div>
+                <div class="form-item"><label>收款方式</label>
+                    <select id="f_pay_method">
+                        <option value="佳洛顺驰">佳洛顺驰</option>
+                        <option value="洛高">洛高</option>
+                        <option value="商场">商场</option>
+                        <option value="个人">个人</option>
+                    </select>
+                </div>
+                <div class="form-item"><label>收款金额</label><input id="f_pay_amount" type="number" step="0.01"></div>
+                <div class="form-item"><label>是否有尾款</label><input id="f_has_balance" readonly></div>
+                <div class="form-item full"><label>安装地址</label><input id="f_address"></div>
+                <div class="form-item"><label>是否安装</label>
+                    <select id="f_installed"><option value="否">否</option><option value="是">是</option></select>
+                </div>
+                <div class="form-item"><label>安装日期</label><input id="f_install_date" type="date"></div>
+                <div class="form-item"><label>安装是否录系统</label>
+                    <select id="f_install_recorded"><option value="否">否</option><option value="是">是</option></select>
+                </div>
+                <div class="form-item"><label>是否录销量</label>
+                    <select id="f_sales_recorded"><option value="否">否</option><option value="是">是</option></select>
+                </div>
+                <div class="form-item"><label>录销量日期</label><input id="f_sales_record_date" type="date"></div>
+                <div class="form-item"><label>是否开发票</label>
+                    <select id="f_invoiced"><option value="否">否</option><option value="是">是</option></select>
+                </div>
+                <div class="form-item"><label>开票日期</label><input id="f_invoice_date" type="date"></div>
+                <div class="form-item"><label>进货价</label><input id="f_cost_price" type="number" step="0.01"></div>
+                <div class="form-item"><label>利润</label><input id="f_profit" readonly></div>
+                <div class="form-item"><label>归属仓库</label>
+                    <select id="f_warehouse">
+                        <option value="新库房">新库房</option>
+                        <option value="老库房">老库房</option>
+                        <option value="无">无</option>
+                    </select>
+                </div>
+                <div class="form-item full"><label>备注</label><textarea id="f_remark" rows="2"></textarea></div>
+            </div>`;
+        }
+
+        function buildStockForm() {
+            const brands = getProductBrands();
+            const brandOpts = buildDatalistOptions(brands);
+            return `
+            <div class="form-grid">
+                <div class="form-item"><label>商品品牌</label>
+                    <input list="f_brand_list" id="f_brand" placeholder="请输入或选择" oninput="onBrandInput('stock')">
+                    <datalist id="f_brand_list">${brandOpts}</datalist>
+                </div>
+                <div class="form-item"><label>商品名称</label>
+                    <input list="f_goods_name_list" id="f_goods_name" placeholder="请输入或选择" oninput="onNameInput('stock')">
+                    <datalist id="f_goods_name_list"></datalist>
+                </div>
+                <div class="form-item"><label>商品型号</label>
+                    <input list="f_model_list" id="f_model" placeholder="请输入或选择">
+                    <datalist id="f_model_list"></datalist>
+                </div>
+                <div class="form-item"><label>账面库存</label><input id="f_book_stock" type="number"></div>
+                <div class="form-item"><label>销售订货</label><input id="f_sales_order" type="number"></div>
+                <div class="form-item"><label>可用库存</label><input id="f_available_stock" readonly></div>
+                <div class="form-item"><label>归属仓库</label>
+                    <select id="f_warehouse"><option value="新库房">新库房</option><option value="老库房">老库房</option></select>
+                </div>
+            </div>`;
+        }
+
+        // ===================================================================
+        // 打开新增表单
+        // ===================================================================
+        function openAddForm(dataType) {
+            const isRetail = dataType.includes('retail') || dataType === 'sampleSell';
+            const isPurchase = dataType.includes('purchase');
+            const isSample = dataType === 'sampleDisplay';
+
+            let formHtml = '';
+
+            if (isPurchase || dataType === 'purchaseExchange' || dataType === 'purchaseReturn') {
+                formHtml = buildPurchaseForm(dataType);
+            } else if (isRetail || dataType === 'sampleSell') {
+                formHtml = buildRetailForm(dataType);
+            } else if (isSample) {
+                formHtml = buildSampleDisplayForm();
+            } else if (dataType === 'stock') {
+                formHtml = buildStockForm();
+            }
+
+            document.getElementById('modal-title').textContent = '新增记录';
+            document.getElementById('modal-body').innerHTML = formHtml;
+            document.getElementById('modal-footer').innerHTML = `
+                <button class="btn btn-default" onclick="closeModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveRow('${dataType}')">保存</button>
+            `;
+            document.getElementById('modal-mask').classList.add('show');
+
+            const prefixMap = {
+                purchaseIn: 'RK-',
+                purchaseExchange: 'HH-',
+                purchaseReturn: 'TH-',
+                retailOrder: 'DD-',
+                retailSell: 'KD-',
+                retailExchange: 'ZH-',
+                retailReturn: 'TT-',
+                sampleDisplay: 'SY-',
+                sampleSell: 'YX-'
+            };
+            if (prefixMap[dataType]) {
+                const noEl = document.getElementById('f_order_no');
+                if (noEl) noEl.value = genOrderNo(prefixMap[dataType], dataType);
+            }
+
+            bindAutoCalc();
+        }
+
+        // ===================================================================
+        // 编辑行
+        // ===================================================================
+        async function editRow(dataType, id) {
+            const list = appData[dataType] || [];
+            const row = list.find(r => r.id === id);
+            if (!row) {
+                alert('记录不存在');
+                return;
+            }
+
+            openAddForm(dataType);
+            Object.keys(row).forEach(key => {
+                const el = document.getElementById('f_' + key);
+                if (el) {
+                    if (el.tagName === 'INPUT' && el.hasAttribute('list')) {
+                        el.value = row[key] || '';
+                        if (key === 'brand') {
+                            onBrandInput(dataType);
+                        } else if (key === 'goods_name') {
+                            onNameInput(dataType);
+                        }
+                    } else if (el.tagName === 'SELECT') {
+                        const options = el.options;
+                        let found = false;
+                        for (let i = 0; i < options.length; i++) {
+                            if (options[i].value == row[key]) {
+                                el.selectedIndex = i;
+                                found = true;
+                                break;
+                            }
+                        }
+                        if (!found) {
+                            el.innerHTML += `<option value="${row[key]}" selected>${row[key]}</option>`;
+                        }
+                    } else {
+                        el.value = row[key] || '';
+                    }
+                }
+            });
+
+            const brandEl = document.getElementById('f_brand');
+            if (brandEl) {
+                const evt = new Event('input');
+                brandEl.dispatchEvent(evt);
+            }
+            setTimeout(() => {
+                const nameEl = document.getElementById('f_goods_name');
+                if (nameEl) {
+                    const evt = new Event('input');
+                    nameEl.dispatchEvent(evt);
+                }
+            }, 50);
+
+            document.getElementById('modal-title').textContent = '编辑记录';
+            document.getElementById('modal-footer').innerHTML = `
+                <button class="btn btn-default" onclick="closeModal()">取消</button>
+                <button class="btn btn-primary" onclick="updateRow('${dataType}', '${id}')">更新</button>
+            `;
+        }
+
+        // ===================================================================
+        // 保存行
+        // ===================================================================
+        async function saveRow(dataType) {
+            const row = collectFormData();
+
+            if (row.quantity && row.price) row.amount = (parseFloat(row.quantity) * parseFloat(row.price)).toFixed(2);
+            if (row.sell_price && row.retail_price) row.discount = (parseFloat(row.sell_price) / parseFloat(row
+                .retail_price)).toFixed(2);
+            if (row.sell_price && row.cost_price) row.profit = (parseFloat(row.sell_price) - parseFloat(row.cost_price))
+                .toFixed(2);
+            if (row.pay_amount && row.sell_price) row.has_balance = parseFloat(row.pay_amount) < parseFloat(row
+                .sell_price) ? '是' : '否';
+
+            try {
+                const tableName = getTableName(dataType);
+                await insertRecord(tableName, row);
+                const fresh = await fetchUserData(tableName);
+                appData[dataType] = fresh || [];
+                closeModal();
+                renderTable(dataType);
+                await updateStock();
+            } catch (err) {
+                alert('保存失败: ' + (err.message || '未知错误'));
+            }
+        }
+
+        // ===================================================================
+        // 更新行
+        // ===================================================================
+        async function updateRow(dataType, id) {
+            const row = collectFormData();
+
+            if (row.quantity && row.price) row.amount = (parseFloat(row.quantity) * parseFloat(row.price)).toFixed(2);
+            if (row.sell_price && row.retail_price) row.discount = (parseFloat(row.sell_price) / parseFloat(row
+                .retail_price)).toFixed(2);
+            if (row.sell_price && row.cost_price) row.profit = (parseFloat(row.sell_price) - parseFloat(row.cost_price))
+                .toFixed(2);
+            if (row.pay_amount && row.sell_price) row.has_balance = parseFloat(row.pay_amount) < parseFloat(row
+                .sell_price) ? '是' : '否';
+
+            try {
+                const tableName = getTableName(dataType);
+                await updateRecord(tableName, id, row);
+                const fresh = await fetchUserData(tableName);
+                appData[dataType] = fresh || [];
+                closeModal();
+                renderTable(dataType);
+                await updateStock();
+            } catch (err) {
+                alert('更新失败: ' + (err.message || '未知错误'));
+            }
+        }
+
+        // ===================================================================
+        // 删除行
+        // ===================================================================
+        async function deleteRow(dataType, id) {
+            if (!confirm('确定删除此条记录？')) return;
+            try {
+                const tableName = getTableName(dataType);
+                await deleteRecord(tableName, id);
+                const fresh = await fetchUserData(tableName);
+                appData[dataType] = fresh || [];
+                renderTable(dataType);
+                await updateStock();
+            } catch (err) {
+                alert('删除失败: ' + (err.message || '未知错误'));
+            }
+        }
+
+        // ===================================================================
+        // 收集表单数据
+        // ===================================================================
+        function collectFormData() {
+            const data = {};
+            document.querySelectorAll('#modal-body input, #modal-body select, #modal-body textarea').forEach(el => {
+                if (el.id.startsWith('f_')) {
+                    const key = el.id.substring(2);
+                    data[key] = el.value;
+                }
+            });
+            return data;
+        }
+
+        // ===================================================================
+        // 绑定自动计算
+        // ===================================================================
+        function bindAutoCalc() {
+            const qty = document.getElementById('f_quantity');
+            const price = document.getElementById('f_price');
+            const amount = document.getElementById('f_amount');
+            if (qty && price && amount) {
+                const calc = () => {
+                    if (qty.value && price.value) amount.value = (parseFloat(qty.value) * parseFloat(price.value)).toFixed(
+                    2);
+                };
+                qty.addEventListener('input', calc);
+                price.addEventListener('input', calc);
+            }
+
+            const sp = document.getElementById('f_sell_price');
+            const rp = document.getElementById('f_retail_price');
+            const disc = document.getElementById('f_discount');
+            if (sp && rp && disc) {
+                const calc = () => {
+                    if (sp.value && rp.value && parseFloat(rp.value) > 0) disc.value = (parseFloat(sp.value) / parseFloat(
+                        rp.value)).toFixed(2);
+                };
+                sp.addEventListener('input', calc);
+                rp.addEventListener('input', calc);
+            }
+
+            const cp = document.getElementById('f_cost_price');
+            const profit = document.getElementById('f_profit');
+            if (sp && cp && profit) {
+                const calc = () => {
+                    if (sp.value && cp.value) profit.value = (parseFloat(sp.value) - parseFloat(cp.value)).toFixed(2);
+                };
+                sp.addEventListener('input', calc);
+                cp.addEventListener('input', calc);
+            }
+
+            const payAmt = document.getElementById('f_pay_amount');
+            const hasBal = document.getElementById('f_has_balance');
+            if (sp && payAmt && hasBal) {
+                const calc = () => {
+                    if (sp.value && payAmt.value) {
+                        hasBal.value = parseFloat(payAmt.value) < parseFloat(sp.value) ? '是' : '否';
+                    }
+                };
+                sp.addEventListener('input', calc);
+                payAmt.addEventListener('input', calc);
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('modal-mask').classList.remove('show');
+        }
+
+        // ===================================================================
+        // 手机号自动填充
+        // ===================================================================
+        function autoFillByPhone() {
+            const phoneEl = document.getElementById('f_phone');
+            if (!phoneEl) return;
+            const phone = phoneEl.value.trim();
+            const listEl = document.getElementById('history-order-list');
+            if (!listEl) return;
+
+            if (!phone) {
+                listEl.style.display = 'none';
+                return;
+            }
+
+            const retailTypes = ['retailOrder', 'retailSell', 'retailExchange', 'retailReturn'];
+            let historyOrders = [];
+            retailTypes.forEach(type => {
+                const items = appData[type] || [];
+                items.forEach(item => {
+                    if (item.phone && item.phone.trim() === phone) {
+                        historyOrders.push({ type: type, ...item });
+                    }
+                });
+            });
+
+            if (historyOrders.length === 0) {
+                listEl.innerHTML = `<div class="history-empty">未找到该手机号的历史订单</div>`;
+                listEl.style.display = 'block';
+                return;
+            }
+
+            const seen = new Set();
+            const unique = historyOrders.filter(item => {
+                const key = item.order_no || item.customer + item.address;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            });
+
+            let html = '';
+            unique.forEach((item, idx) => {
+                const label =
+                    `${item.order_no || '无单号'} | ${item.customer || '无姓名'} | ${item.address || '无地址'}`;
+                html += `<div class="history-item" data-idx="${idx}">
+                    <span class="h-label">📋</span> ${label}
+                </div>`;
+            });
+            listEl.innerHTML = html;
+            listEl.style.display = 'block';
+
+            listEl.querySelectorAll('.history-item').forEach(el => {
+                el.addEventListener('click', function() {
+                    const idx = parseInt(this.dataset.idx);
+                    const selected = unique[idx];
+                    if (selected) {
+                        const customerEl = document.getElementById('f_customer');
+                        if (customerEl) customerEl.value = selected.customer || '';
+                        const addressEl = document.getElementById('f_address');
+                        if (addressEl) addressEl.value = selected.address || '';
+                        const brandEl = document.getElementById('f_brand');
+                        if (brandEl && selected.brand) {
+                            brandEl.value = selected.brand;
+                            const evt = new Event('input');
+                            brandEl.dispatchEvent(evt);
+                        }
+                        setTimeout(() => {
+                            const nameEl = document.getElementById('f_goods_name');
+                            if (nameEl && selected.goods_name) {
+                                nameEl.value = selected.goods_name;
+                                const evt = new Event('input');
+                                nameEl.dispatchEvent(evt);
+                            }
+                        }, 100);
+                        setTimeout(() => {
+                            const modelEl = document.getElementById('f_model');
+                            if (modelEl && selected.model) {
+                                modelEl.value = selected.model;
+                            }
+                        }, 200);
+                        const salesmanEl = document.getElementById('f_salesman');
+                        if (salesmanEl && selected.salesman) {
+                            salesmanEl.value = selected.salesman;
+                        }
+                        const warehouseEl = document.getElementById('f_warehouse');
+                        if (warehouseEl && selected.warehouse) {
+                            for (let i = 0; i < warehouseEl.options.length; i++) {
+                                if (warehouseEl.options[i].value === selected.warehouse) {
+                                    warehouseEl.selectedIndex = i;
+                                    break;
+                                }
+                            }
+                        }
+                        listEl.style.display = 'none';
+                    }
+                });
+            });
+        }
+
+        // ===================================================================
+        // 库存更新
+        // ===================================================================
+        async function updateStock() {
+            const stockMap = {};
+
+            function getStockKey(item) {
+                return item.model || '无型号';
+            }
+
+            (appData.purchaseIn || []).forEach(item => {
+                const key = getStockKey(item);
+                if (!stockMap[key]) {
+                    stockMap[key] = {
+                        brand: item.brand || '',
+                        goods_name: item.goods_name || item.goodsName || '',
+                        model: item.model || '',
+                        warehouse: '全部',
+                        book_stock: 0,
+                        sales_order: 0
+                    };
+                }
+                stockMap[key].book_stock += Number(item.quantity) || 0;
+            });
+
+            (appData.purchaseReturn || []).forEach(item => {
+                const key = getStockKey(item);
+                if (!stockMap[key]) {
+                    stockMap[key] = {
+                        brand: item.brand || '',
+                        goods_name: item.goods_name || item.goodsName || '',
+                        model: item.model || '',
+                        warehouse: '全部',
+                        book_stock: 0,
+                        sales_order: 0
+                    };
+                }
+                stockMap[key].book_stock -= Number(item.quantity) || 0;
+            });
+
+            (appData.retailReturn || []).forEach(item => {
+                const key = getStockKey(item);
+                if (!stockMap[key]) {
+                    stockMap[key] = {
+                        brand: item.brand || '',
+                        goods_name: item.goods_name || item.goodsName || '',
+                        model: item.model || '',
+                        warehouse: '全部',
+                        book_stock: 0,
+                        sales_order: 0
+                    };
+                }
+                stockMap[key].book_stock += 1;
+            });
+
+            (appData.sampleDisplay || []).forEach(item => {
+                const key = getStockKey(item);
+                if (!stockMap[key]) {
+                    stockMap[key] = {
+                        brand: item.brand || '',
+                        goods_name: item.goods_name || item.goodsName || '',
+                        model: item.model || '',
+                        warehouse: '全部',
+                        book_stock: 0,
+                        sales_order: 0
+                    };
+                }
+                stockMap[key].book_stock -= Number(item.quantity) || 0;
+            });
+
+            const orderTypes = ['retailOrder', 'retailSell'];
+            orderTypes.forEach(type => {
+                (appData[type] || []).forEach(item => {
+                    const key = getStockKey(item);
+                    if (!stockMap[key]) {
+                        stockMap[key] = {
+                            brand: item.brand || '',
+                            goods_name: item.goods_name || item.goodsName || '',
+                            model: item.model || '',
+                            warehouse: '全部',
+                            book_stock: 0,
+                            sales_order: 0
+                        };
+                    }
+                    stockMap[key].sales_order += 1;
+                });
+            });
+
+            (appData.retailExchange || []).forEach(item => {
+                const key = getStockKey(item);
+                if (!stockMap[key]) {
+                    stockMap[key] = {
+                        brand: item.brand || '',
+                        goods_name: item.goods_name || item.goodsName || '',
+                        model: item.model || '',
+                        warehouse: '全部',
+                        book_stock: 0,
+                        sales_order: 0
+                    };
+                }
+                stockMap[key].sales_order += 1;
+            });
+
+            Object.values(stockMap).forEach(s => {
+                s.available_stock = s.book_stock - s.sales_order;
+            });
+
+            const tableName = 'stock';
+            await supabase.from(tableName).delete().eq('user_id', currentUserId);
+
+            const records = Object.values(stockMap);
+            if (records.length > 0) {
+                const payloads = records.map(r => ({ ...r, user_id: currentUserId }));
+                await supabase.from(tableName).insert(payloads);
+            }
+
+            const fresh = await fetchUserData(tableName);
+            appData.stock = fresh || [];
+        }
+
+        // ===================================================================
+        // Excel 导入
+        // ===================================================================
+        function importExcel(dataType) {
+            document.getElementById('file-import').click();
+        }
+
+        function excelSerialToDate(serial) {
+            if (typeof serial !== 'number' || serial < 0 || serial > 60000) return serial;
+            let days = serial;
+            if (serial >= 61) {
+                days = serial - 1;
+            }
+            const epoch = new Date(1899, 11, 30);
+            const date = new Date(epoch.getTime() + days * 86400000);
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        async function handleFileImport(dataType) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                const json = XLSX.utils.sheet_to_json(sheet);
+
+                const cols = getTableColumns(dataType);
+                const colMap = {};
+                cols.forEach(c => colMap[c.label] = c.key);
+
+                let dateFields = [];
+                if (dataType === 'purchaseIn' || dataType === 'purchaseExchange' || dataType === 'purchaseReturn') {
+                    dateFields = ['purchase_date', 'receive_date', 'invoice_date'];
+                } else if (dataType === 'retailOrder' || dataType === 'retailSell' || dataType === 'retailExchange' ||
+                    dataType === 'retailReturn') {
+                    dateFields = ['order_date', 'install_date', 'sales_record_date', 'invoice_date', 'pos_date'];
+                } else if (dataType === 'sampleDisplay') {
+                    dateFields = ['display_date'];
+                } else if (dataType === 'sampleSell') {
+                    dateFields = ['order_date', 'install_date', 'sales_record_date', 'invoice_date'];
+                }
+
+                let imported = 0;
+                const records = [];
+                json.forEach(row => {
+                    const mapped = {};
+                    Object.keys(row).forEach(k => {
+                        if (colMap[k]) mapped[colMap[k]] = row[k];
+                    });
+
+                    dateFields.forEach(field => {
+                        if (mapped[field] !== undefined && mapped[field] !== null && mapped[field] !==
+                            '') {
+                            const val = mapped[field];
+                            if (typeof val === 'number') {
+                                mapped[field] = excelSerialToDate(val);
+                            } else if (typeof val === 'string' && /^\d+$/.test(val.trim())) {
+                                const num = parseInt(val.trim());
+                                if (num > 0 && num < 60000) {
+                                    mapped[field] = excelSerialToDate(num);
+                                }
+                            }
+                        }
+                    });
+
+                    if (!mapped.order_no) {
+                        const prefixMap = {
+                            purchaseIn: 'RK-',
+                            purchaseExchange: 'HH-',
+                            purchaseReturn: 'TH-',
+                            retailOrder: 'DD-',
+                            retailSell: 'KD-',
+                            retailExchange: 'ZH-',
+                            retailReturn: 'TT-',
+                            sampleDisplay: 'SY-',
+                            sampleSell: 'YX-'
+                        };
+                        mapped.order_no = genOrderNo(prefixMap[dataType] || 'IM-', dataType);
+                    }
+
+                    if (mapped.quantity && mapped.price) mapped.amount = (parseFloat(mapped.quantity) * parseFloat(mapped
+                        .price)).toFixed(2);
+                    if (mapped.sell_price && mapped.retail_price) mapped.discount = (parseFloat(mapped.sell_price) /
+                        parseFloat(mapped.retail_price)).toFixed(2);
+                    if (mapped.sell_price && mapped.cost_price) mapped.profit = (parseFloat(mapped.sell_price) - parseFloat(
+                        mapped.cost_price)).toFixed(2);
+
+                    if (!mapped.warehouse) mapped.warehouse = '新库房';
+
+                    records.push(mapped);
+                    imported++;
+                });
+
+                if (records.length === 0) {
+                    alert('没有有效数据可导入，请检查列名是否匹配');
+                    event.target.value = '';
+                    return;
+                }
+
+                try {
+                    const tableName = getTableName(dataType);
+                    await insertRecords(tableName, records);
+                    const fresh = await fetchUserData(tableName);
+                    appData[dataType] = fresh || [];
+                    await updateStock();
+                    renderTable(dataType);
+                    alert(`成功导入 ${imported} 条记录`);
+                } catch (err) {
+                    alert('导入失败: ' + (err.message || '未知错误'));
+                }
+                event.target.value = '';
+            };
+            reader.readAsArrayBuffer(file);
+            event.target.value = '';
+        }
+
+        // ===================================================================
+        // 导出功能
+        // ===================================================================
+        function exportExcel(dataType) {
+            showExportConfig(dataType);
+        }
+
+        function showExportConfig(dataType) {
+            const cols = getTableColumns(dataType);
+            if (!cols || cols.length === 0) {
+                alert('该模块暂无导出配置');
+                return;
+            }
+
+            let fieldHtml = '';
+            cols.forEach((c) => {
+                fieldHtml += `
+                    <label>
+                        <input type="checkbox" class="export-field-cb" data-key="${c.key}" value="${c.key}" checked>
+                        ${c.label}
+                    </label>
+                `;
+            });
+
+            const modalBody = `
+                <div style="margin-bottom:10px;">
+                    <span style="font-weight:500;font-size:14px;">选择要导出的字段：</span>
+                    <span class="select-all-link" onclick="toggleExportFields(true)">全选</span>
+                    <span class="select-all-link" onclick="toggleExportFields(false)">取消全选</span>
+                    <span class="field-count">已选 <span id="selected-count">${cols.length}</span> 个字段</span>
+                </div>
+                <div class="export-field-grid" id="export-field-grid">
+                    ${fieldHtml}
+                </div>
+            `;
+
+            document.getElementById('modal-title').textContent = '导出配置';
+            document.getElementById('modal-body').innerHTML = modalBody;
+            document.getElementById('modal-footer').innerHTML = `
+                <button class="btn btn-default" onclick="closeModal()">取消</button>
+                <button class="btn btn-success" onclick="generateExcel('${dataType}')">确认导出</button>
+            `;
+            document.getElementById('modal-mask').classList.add('show');
+
+            document.querySelectorAll('.export-field-cb').forEach(cb => {
+                cb.addEventListener('change', updateExportFieldCount);
+            });
+            updateExportFieldCount();
+        }
+
+        function updateExportFieldCount() {
+            const checked = document.querySelectorAll('.export-field-cb:checked').length;
+            const el = document.getElementById('selected-count');
+            if (el) el.textContent = checked;
+        }
+
+        function toggleExportFields(selectAll) {
+            document.querySelectorAll('.export-field-cb').forEach(cb => {
+                cb.checked = selectAll;
+            });
+            updateExportFieldCount();
+        }
+
+        function generateExcel(dataType) {
+            const cols = getTableColumns(dataType);
+            let data = getFilteredData(dataType);
+
+            const selectedKeys = [];
+            document.querySelectorAll('.export-field-cb:checked').forEach(cb => {
+                selectedKeys.push(cb.value);
+            });
+
+            if (selectedKeys.length === 0) {
+                alert('请至少选择一个字段');
+                return;
+            }
+
+            const selectedCols = cols.filter(c => selectedKeys.includes(c.key));
+
+            const headerLabels = selectedCols.map(c => c.label);
+            const excelData = [headerLabels];
+
+            data.forEach(row => {
+                const rowArr = selectedCols.map(c => {
+                    let val = row[c.key];
+                    if (val === undefined || val === null) val = '';
+                    if (typeof val === 'number' && !Number.isInteger(val)) {
+                        val = Number(val).toFixed(2);
+                    }
+                    return val;
+                });
+                excelData.push(rowArr);
+            });
+
+            const ws = XLSX.utils.aoa_to_sheet(excelData);
+            const colWidths = headerLabels.map(() => ({ wch: 16 }));
+            ws['!cols'] = colWidths;
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, '汇总表');
+
+            const titleMap = {
+                purchaseIn: '采购入库汇总表',
+                purchaseExchange: '采购换货汇总表',
+                purchaseReturn: '采购退货汇总表',
+                retailOrder: '零售订单汇总表',
+                retailSell: '零售开单汇总表',
+                retailExchange: '零售换货汇总表',
+                retailReturn: '零售退货汇总表',
+                stock: '库存日报表',
+                sampleDisplay: '门店上样汇总表',
+                sampleSell: '样机销售汇总表'
+            };
+
+            const fileName = `${titleMap[dataType] || '导出数据'}.xlsx`;
+            XLSX.writeFile(wb, fileName);
+            closeModal();
+        }
+
+        // ===================================================================
+        // 初始化更新库存
+        // ===================================================================
+        (function() {
+            const checkAndUpdate = setInterval(async () => {
+                if (dataReady && currentUserId) {
+                    clearInterval(checkAndUpdate);
+                    await updateStock();
+                    if (currentPage === 'stock-daily') {
+                        renderTable('stock');
+                    }
+                }
+            }, 500);
+        })();
+
+        // 暴露全局函数
+        window.toggleMenu = toggleMenu;
+        window.showPage = showPage;
+        window.openAddForm = openAddForm;
+        window.editRow = editRow;
+        window.saveRow = saveRow;
+        window.updateRow = updateRow;
+        window.deleteRow = deleteRow;
+        window.closeModal = closeModal;
+        window.importExcel = importExcel;
+        window.handleFileImport = handleFileImport;
+        window.exportExcel = exportExcel;
+        window.renderTable = renderTable;
+        window.autoFillByPhone = autoFillByPhone;
+        window.onBrandInput = onBrandInput;
+        window.onNameInput = onNameInput;
+        window.toggleExportFields = toggleExportFields;
+        window.updateExportFieldCount = updateExportFieldCount;
+        window.generateExcel = generateExcel;
+        window.jumpToRetailByProduct = jumpToRetailByProduct;
+        window.openBaseAddForm = openBaseAddForm;
+        window.saveBaseRow = saveBaseRow;
+        window.editBaseRow = editBaseRow;
+        window.updateBaseRow = updateBaseRow;
+        window.deleteBaseRow = deleteBaseRow;
+        window.renderBaseTable = renderBaseTable;
+        window.doLogin = doLogin;
+        window.doRegister = doRegister;
+        window.importBaseExcel = importBaseExcel;
+        window.handleBaseFileImport = handleBaseFileImport;
+        window.toggleRepeatFilter = toggleRepeatFilter;
+        window.getFilteredData = getFilteredData;
+        window.batchDelete = batchDelete;
+        window.toggleAllCheckboxes = toggleAllCheckboxes;
+        window.updateBatchDeleteBtn = updateBatchDeleteBtn;
+        window.renderDashboard = renderDashboard;
+        window.refreshDashboard = refreshDashboard;
+        window.setDashboardRange = setDashboardRange;
+        window.updateProfile = updateProfile;
+        window.logout = logout;
+        window.selectAvatarColor = selectAvatarColor;
+        window.exportUserData = exportUserData;
+        window.importUserData = importUserData;
+        window.exportDashboardExcel = exportDashboardExcel;
+        window.updateStock = updateStock;
+        window.excelSerialToDate = excelSerialToDate;
+        window.switchTab = switchTab;
+    </script>
+</body>
+</html>
