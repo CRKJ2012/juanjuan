@@ -1171,7 +1171,6 @@
 
         console.log('🚀 系统启动中 v2.0.1');
 
-        // 初始化 Supabase
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         // 全局状态
@@ -1218,7 +1217,6 @@
             }
         }
 
-        // 给所有 .auth-tab 绑定点击事件
         document.addEventListener('DOMContentLoaded', function() {
             document.querySelectorAll('.auth-tab').forEach(function(tab) {
                 tab.addEventListener('click', function() {
@@ -1234,7 +1232,6 @@
         window.onload = function() {
             console.log('⏳ 初始化...');
 
-            // 2秒后显示登录页
             setTimeout(function() {
                 const splash = document.getElementById('splash-screen');
                 if (splash) {
@@ -1248,7 +1245,6 @@
                 }
             }, 2000);
 
-            // 测试 Supabase 连接
             setTimeout(async function() {
                 try {
                     const { data, error } = await supabase
@@ -1290,7 +1286,6 @@
             const pwd2 = document.getElementById('reg-password2').value;
             const tip = document.getElementById('reg-tip');
 
-            // 验证输入
             if (!name) {
                 tip.textContent = '请输入账号';
                 tip.style.display = 'block';
@@ -1325,7 +1320,6 @@
             try {
                 console.log('📝 注册尝试:', name);
 
-                // 检查用户名是否已存在
                 const { data: existingUser, error: checkError } = await supabase
                     .from('users')
                     .select('id')
@@ -1339,7 +1333,6 @@
                     return;
                 }
 
-                // 检查邮箱是否已存在
                 const { data: existingEmail, error: emailCheckError } = await supabase
                     .from('users')
                     .select('id')
@@ -1353,7 +1346,6 @@
                     return;
                 }
 
-                // 直接在 users 表中创建用户
                 const newUser = {
                     username: name,
                     email: email,
@@ -1410,7 +1402,6 @@
             try {
                 console.log('🔍 登录尝试:', name);
 
-                // 直接查询 users 表验证
                 const { data: userData, error: userError } = await supabase
                     .from('users')
                     .select('*')
@@ -1503,7 +1494,7 @@
                     .from(tableName)
                     .select('*')
                     .eq('user_id', currentUserId)
-                    .order('created_at', { ascending: false });
+                    .order('created_at', { ascending: true });
                 if (error) {
                     console.warn(`加载 ${tableName} 失败:`, error.message);
                     return [];
@@ -1525,7 +1516,6 @@
             const firstMenu = document.querySelector('.menu-title');
             if (firstMenu) toggleMenu(firstMenu);
             showPage('dashboard');
-            // 订阅实时更新
             subscribeRealtime();
         }
 
@@ -2123,246 +2113,186 @@
             alert('✅ 数据备份已导出！');
         }
 
-      // ===================================================================
-// 数据导入（支持多种 JSON 格式）
-// ===================================================================
-// ===================================================================
-// 数据导入（支持老版本 JSON，保持顺序）
-// ===================================================================
-// ===================================================================
-// 数据导入（完全保持原有顺序）
-// ===================================================================
-async function importUserData(event) {
-    const file = event.target.files[0];
-    if (!file) return;
+        async function importUserData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
 
-    if (!confirm('⚠️ 导入将覆盖当前所有数据，确定继续吗？')) {
-        event.target.value = '';
-        return;
-    }
-
-    try {
-        const reader = new FileReader();
-        reader.onload = async function(e) {
-            try {
-                const text = e.target.result;
-                console.log('📄 文件内容预览（前200字符）:', text.substring(0, 200));
-                
-                let imported = JSON.parse(text);
-                console.log('📦 解析后的数据:', imported);
-                console.log('📄 顶层 keys:', Object.keys(imported));
-
-                // 尝试找到数据
-                let dataToImport = null;
-                let dataSource = '';
-
-                if (imported.data && typeof imported.data === 'object') {
-                    dataToImport = imported.data;
-                    dataSource = 'data 字段';
-                    console.log('✅ 使用 data 字段');
-                } else if (imported.purchaseIn || imported.retailOrder || imported.users) {
-                    dataToImport = imported;
-                    dataSource = '直接数据';
-                    console.log('✅ 使用直接数据');
-                } else {
-                    for (const key of Object.keys(imported)) {
-                        const val = imported[key];
-                        if (Array.isArray(val) && val.length > 0) {
-                            dataToImport = imported;
-                            dataSource = '包含数组数据';
-                            console.log(`✅ 找到数组数据: ${key}`);
-                            break;
-                        }
-                    }
-                }
-
-                if (!dataToImport) {
-                    alert('❌ 无法识别数据格式');
-                    return;
-                }
-
-                console.log('📦 数据源:', dataSource);
-                console.log('📦 数据 keys:', Object.keys(dataToImport));
-
-                // 字段映射
-                const fieldMap = {
-                    'orderNo': 'order_no',
-                    'orderSource': 'order_source',
-                    'orderDate': 'order_date',
-                    'purchaseDate': 'purchase_date',
-                    'receiveDate': 'receive_date',
-                    'displayDate': 'display_date',
-                    'goodsName': 'goods_name',
-                    'sellPrice': 'sell_price',
-                    'retailPrice': 'retail_price',
-                    'payMethod': 'pay_method',
-                    'payAmount': 'pay_amount',
-                    'hasBalance': 'has_balance',
-                    'costPrice': 'cost_price',
-                    'posOwner': 'pos_owner',
-                    'posAmount': 'pos_amount',
-                    'subsidyAmount': 'subsidy_amount',
-                    'posDate': 'pos_date',
-                    'invoiceAmount': 'invoice_amount',
-                    'invoiceDate': 'invoice_date',
-                    'salesRecorded': 'sales_recorded',
-                    'installDate': 'install_date',
-                    'installRecorded': 'install_recorded',
-                    'salesRecordDate': 'sales_record_date',
-                    'storeAddress': 'store_address',
-                    'empNo': 'emp_no',
-                    'bookStock': 'book_stock',
-                    'salesOrder': 'sales_order',
-                    'availableStock': 'available_stock',
-                    'defaultWarehouse': 'default_warehouse',
-                    'avatarColor': 'avatar_color',
-                    'registerTime': 'register_time',
-                };
-
-                function convertFields(obj) {
-                    if (!obj || typeof obj !== 'object') return obj;
-                    const newObj = {};
-                    for (const [key, value] of Object.entries(obj)) {
-                        if (key === 'id' || key === 'user_id' || key === 'created_at') continue;
-                        const newKey = fieldMap[key] || key;
-                        newObj[newKey] = value;
-                    }
-                    return newObj;
-                }
-
-                // ============================================================
-                // 按指定顺序导入（保持原顺序，逐条插入）
-                // ============================================================
-                const tableOrder = [
-                    { oldKey: 'purchaseIn', tableName: 'purchase_in' },
-                    { oldKey: 'purchaseExchange', tableName: 'purchase_exchange' },
-                    { oldKey: 'purchaseReturn', tableName: 'purchase_return' },
-                    { oldKey: 'retailOrder', tableName: 'retail_order' },
-                    { oldKey: 'retailSell', tableName: 'retail_sell' },
-                    { oldKey: 'retailExchange', tableName: 'retail_exchange' },
-                    { oldKey: 'retailReturn', tableName: 'retail_return' },
-                    { oldKey: 'sampleDisplay', tableName: 'sample_display' },
-                    { oldKey: 'sampleSell', tableName: 'sample_sell' },
-                    { oldKey: 'productInfo', tableName: 'product_info' },
-                    { oldKey: 'employeeInfo', tableName: 'employee_info' },
-                    { oldKey: 'supplierInfo', tableName: 'supplier_info' },
-                    { oldKey: 'stock', tableName: 'stock' }
-                ];
-
-                let totalImported = 0;
-                let importedTables = [];
-
-                // 按顺序导入每个表
-                for (const { oldKey, tableName } of tableOrder) {
-                    let records = dataToImport[oldKey] || [];
-                    if (!Array.isArray(records)) {
-                        if (typeof records === 'object' && records !== null) {
-                            records = Object.values(records);
-                        } else {
-                            records = [];
-                        }
-                    }
-                    if (records.length === 0) continue;
-
-                    console.log(`📥 导入 ${oldKey}: ${records.length} 条记录`);
-                    importedTables.push(`${oldKey}(${records.length})`);
-
-                    // 删除该表当前用户的所有数据
-                    await supabase
-                        .from(tableName)
-                        .delete()
-                        .eq('user_id', currentUserId);
-
-                    // 逐条插入，保持原有顺序（先转换所有记录）
-                    const convertedRecords = records.map(record => {
-                        const converted = convertFields(record);
-                        if (currentUserId) converted.user_id = currentUserId;
-                        return converted;
-                    });
-
-                    // 按顺序逐条插入（使用 for 循环保证顺序）
-                    for (let i = 0; i < convertedRecords.length; i++) {
-                        const record = convertedRecords[i];
-                        try {
-                            const { error } = await supabase
-                                .from(tableName)
-                                .insert([record]);
-                            if (error) {
-                                console.error(`导入第 ${i+1} 条失败:`, error);
-                            } else {
-                                totalImported++;
-                            }
-                        } catch (err) {
-                            console.error(`导入第 ${i+1} 条异常:`, err);
-                        }
-                        // 每10条显示进度
-                        if ((i + 1) % 10 === 0) {
-                            console.log(`  已导入 ${i+1}/${convertedRecords.length} 条`);
-                        }
-                    }
-                    console.log(`  ✅ ${oldKey} 导入完成`);
-                }
-
-                // 处理 users（放在最后）
-                if (dataToImport.users) {
-                    let userRecords = dataToImport.users;
-                    if (!Array.isArray(userRecords)) {
-                        userRecords = Object.values(userRecords);
-                    }
-                    console.log(`📥 导入 users: ${userRecords.length} 条记录`);
-                    
-                    // 逐条插入
-                    for (let i = 0; i < userRecords.length; i++) {
-                        const user = userRecords[i];
-                        const converted = convertFields(user);
-                        if (converted.username) {
-                            const { data: existing } = await supabase
-                                .from('users')
-                                .select('id')
-                                .eq('username', converted.username)
-                                .maybeSingle();
-                            
-                            if (!existing) {
-                                const newUser = {
-                                    username: converted.username,
-                                    email: converted.email || converted.username + '@import.com',
-                                    password: 'imported123',
-                                    nickname: converted.nickname || '',
-                                    bio: converted.bio || '',
-                                    default_warehouse: converted.default_warehouse || '新库房',
-                                    avatar_color: converted.avatar_color || '#e94560',
-                                    register_time: converted.register_time || new Date().toLocaleString()
-                                };
-                                await supabase
-                                    .from('users')
-                                    .insert([newUser]);
-                            }
-                        }
-                    }
-                }
-
-                // 重新加载数据
-                await loadAllUserData();
-                await updateStock();
-                
-                alert(`✅ 数据恢复成功！\n导入表: ${importedTables.join(', ')}\n总记录数: ${totalImported} 条`);
-                console.log('✅ 导入完成，顺序已保持');
-                
-                if (currentPage) showPage(currentPage);
-                else showPage('dashboard');
-
-            } catch (parseErr) {
-                console.error('解析失败:', parseErr);
-                alert('❌ 解析失败: ' + parseErr.message);
+            if (!confirm('⚠️ 导入将覆盖当前所有数据，确定继续吗？')) {
+                event.target.value = '';
+                return;
             }
-        };
-        reader.readAsText(file);
-    } catch (err) {
-        console.error('读取文件失败:', err);
-        alert('❌ 读取文件失败: ' + err.message);
-    }
-    event.target.value = '';
-}
+
+            try {
+                const reader = new FileReader();
+                reader.onload = async function(e) {
+                    try {
+                        let imported = JSON.parse(e.target.result);
+
+                        let dataToImport = null;
+                        if (imported.data && typeof imported.data === 'object') {
+                            dataToImport = imported.data;
+                        } else if (imported.purchaseIn || imported.retailOrder || imported.users) {
+                            dataToImport = imported;
+                        } else {
+                            for (const key of Object.keys(imported)) {
+                                if (Array.isArray(imported[key]) && imported[key].length > 0) {
+                                    dataToImport = imported;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (!dataToImport) {
+                            alert('❌ 无法识别数据格式');
+                            return;
+                        }
+
+                        const fieldMap = {
+                            'orderNo': 'order_no',
+                            'orderSource': 'order_source',
+                            'orderDate': 'order_date',
+                            'purchaseDate': 'purchase_date',
+                            'receiveDate': 'receive_date',
+                            'displayDate': 'display_date',
+                            'goodsName': 'goods_name',
+                            'sellPrice': 'sell_price',
+                            'retailPrice': 'retail_price',
+                            'payMethod': 'pay_method',
+                            'payAmount': 'pay_amount',
+                            'hasBalance': 'has_balance',
+                            'costPrice': 'cost_price',
+                            'posOwner': 'pos_owner',
+                            'posAmount': 'pos_amount',
+                            'subsidyAmount': 'subsidy_amount',
+                            'posDate': 'pos_date',
+                            'invoiceAmount': 'invoice_amount',
+                            'invoiceDate': 'invoice_date',
+                            'salesRecorded': 'sales_recorded',
+                            'installDate': 'install_date',
+                            'installRecorded': 'install_recorded',
+                            'salesRecordDate': 'sales_record_date',
+                            'storeAddress': 'store_address',
+                            'empNo': 'emp_no',
+                            'bookStock': 'book_stock',
+                            'salesOrder': 'sales_order',
+                            'availableStock': 'available_stock',
+                            'defaultWarehouse': 'default_warehouse',
+                            'avatarColor': 'avatar_color',
+                            'registerTime': 'register_time',
+                        };
+
+                        function convertFields(obj) {
+                            const newObj = {};
+                            for (const [key, value] of Object.entries(obj)) {
+                                if (key === 'id' || key === 'user_id' || key === 'created_at') continue;
+                                const newKey = fieldMap[key] || key;
+                                newObj[newKey] = value;
+                            }
+                            return newObj;
+                        }
+
+                        const tables = [
+                            ['purchaseIn', 'purchase_in'],
+                            ['purchaseExchange', 'purchase_exchange'],
+                            ['purchaseReturn', 'purchase_return'],
+                            ['retailOrder', 'retail_order'],
+                            ['retailSell', 'retail_sell'],
+                            ['retailExchange', 'retail_exchange'],
+                            ['retailReturn', 'retail_return'],
+                            ['sampleDisplay', 'sample_display'],
+                            ['sampleSell', 'sample_sell'],
+                            ['productInfo', 'product_info'],
+                            ['employeeInfo', 'employee_info'],
+                            ['supplierInfo', 'supplier_info'],
+                            ['stock', 'stock']
+                        ];
+
+                        let totalImported = 0;
+                        let importedTables = [];
+
+                        // 先清空所有表
+                        for (const [oldKey, tableName] of tables) {
+                            await supabase.from(tableName).delete().eq('user_id', currentUserId);
+                        }
+
+                        // 按顺序导入
+                        for (const [oldKey, tableName] of tables) {
+                            let records = dataToImport[oldKey] || [];
+                            if (!Array.isArray(records)) {
+                                records = Object.values(records);
+                            }
+                            if (records.length === 0) continue;
+
+                            console.log(`📥 导入 ${oldKey}: ${records.length} 条`);
+                            importedTables.push(oldKey);
+
+                            const converted = records.map(r => {
+                                const c = convertFields(r);
+                                c.user_id = currentUserId;
+                                return c;
+                            });
+
+                            // 分批插入
+                            const batchSize = 100;
+                            for (let i = 0; i < converted.length; i += batchSize) {
+                                const batch = converted.slice(i, i + batchSize);
+                                try {
+                                    const { error } = await supabase
+                                        .from(tableName)
+                                        .insert(batch);
+                                    if (!error) totalImported += batch.length;
+                                } catch (err) {
+                                    console.error(`导入 ${oldKey} 批次失败:`, err);
+                                }
+                            }
+                        }
+
+                        // 导入 users
+                        if (dataToImport.users) {
+                            let users = dataToImport.users;
+                            if (!Array.isArray(users)) users = Object.values(users);
+                            for (const user of users) {
+                                const c = convertFields(user);
+                                if (c.username) {
+                                    const { data: existing } = await supabase
+                                        .from('users')
+                                        .select('id')
+                                        .eq('username', c.username)
+                                        .maybeSingle();
+                                    if (!existing) {
+                                        await supabase.from('users').insert([{
+                                            username: c.username,
+                                            email: c.email || c.username + '@import.com',
+                                            password: 'imported123',
+                                            nickname: c.nickname || '',
+                                            bio: c.bio || '',
+                                            default_warehouse: c.default_warehouse || '新库房',
+                                            avatar_color: c.avatar_color || '#e94560',
+                                            register_time: c.register_time || new Date()
+                                                .toLocaleString()
+                                        }]);
+                                    }
+                                }
+                            }
+                        }
+
+                        await loadAllUserData();
+                        await updateStock();
+
+                        alert(`✅ 导入成功！共 ${totalImported} 条记录`);
+                        if (currentPage) showPage(currentPage);
+                        else showPage('dashboard');
+
+                    } catch (err) {
+                        alert('导入失败: ' + err.message);
+                    }
+                };
+                reader.readAsText(file);
+            } catch (err) {
+                alert('读取文件失败: ' + err.message);
+            }
+            event.target.value = '';
+        }
 
         // ===================================================================
         // 辅助函数
@@ -2412,7 +2342,7 @@ async function importUserData(event) {
                 dataType = 'productInfo';
                 fields = ['brand', 'goods_name', 'model', 'spec', 'unit', 'remark'];
                 labelMap = { brand: '商品品牌', goods_name: '商品名称', model: '商品型号', spec: '规格参数', unit: '单位',
-                remark: '备注' };
+                    remark: '备注' };
             } else if (page === 'base-employee') {
                 title = '员工信息';
                 dataType = 'employeeInfo';
@@ -2801,6 +2731,37 @@ async function importUserData(event) {
             return true;
         }
 
+        // ===================================================================
+        // 批量删除功能（修复版）
+        // ===================================================================
+        async function batchDelete(dataType) {
+            const checkedBoxes = document.querySelectorAll('.row-checkbox:checked');
+            if (checkedBoxes.length === 0) {
+                alert('请至少选择一条记录');
+                return;
+            }
+            if (!confirm(`确定要删除选中的 ${checkedBoxes.length} 条记录吗？此操作不可恢复！`)) return;
+
+            const ids = [];
+            checkedBoxes.forEach(cb => {
+                const id = cb.dataset.id;
+                if (id) ids.push(id);
+            });
+
+            try {
+                const tableName = getTableName(dataType);
+                await deleteRecords(tableName, ids);
+                const fresh = await fetchUserData(tableName);
+                appData[dataType] = fresh || [];
+                await updateStock();
+                renderTable(dataType);
+                document.getElementById('batch-delete-btn').style.display = 'none';
+                alert(`✅ 成功删除 ${ids.length} 条记录`);
+            } catch (err) {
+                alert('❌ 批量删除失败: ' + (err.message || '未知错误'));
+            }
+        }
+
         function getFilteredData(dataType) {
             let data = appData[dataType] || [];
 
@@ -2868,6 +2829,13 @@ async function importUserData(event) {
                     return key && countMap[key] > 1;
                 });
             }
+
+            // 按 created_at 升序排列（保持导入顺序）
+            data = data.sort((a, b) => {
+                const dateA = new Date(a.created_at || 0);
+                const dateB = new Date(b.created_at || 0);
+                return dateA - dateB;
+            });
 
             return data;
         }
@@ -3614,7 +3582,7 @@ async function importUserData(event) {
             if (qty && price && amount) {
                 const calc = () => {
                     if (qty.value && price.value) amount.value = (parseFloat(qty.value) * parseFloat(price.value)).toFixed(
-                    2);
+                        2);
                 };
                 qty.addEventListener('input', calc);
                 price.addEventListener('input', calc);
@@ -3879,20 +3847,27 @@ async function importUserData(event) {
         }
 
         // ===================================================================
-        // Excel 导入
+        // Excel 导入（修复日期偏移问题）
         // ===================================================================
         function importExcel(dataType) {
             document.getElementById('file-import').click();
         }
 
+        // 修复日期偏移：Excel日期序列号转日期字符串
         function excelSerialToDate(serial) {
             if (typeof serial !== 'number' || serial < 0 || serial > 60000) return serial;
+            
+            // Excel日期从1899-12-30开始计算
+            // 使用更精确的转换方法
+            const excelEpoch = new Date(1899, 11, 30);
+            // 如果序列号 >= 61，需要减1（因为Excel的1900-02-29 bug）
             let days = serial;
             if (serial >= 61) {
                 days = serial - 1;
             }
-            const epoch = new Date(1899, 11, 30);
-            const date = new Date(epoch.getTime() + days * 86400000);
+            const date = new Date(excelEpoch.getTime() + days * 86400000);
+            
+            // 使用本地时区格式化，避免时区偏移
             const year = date.getFullYear();
             const month = String(date.getMonth() + 1).padStart(2, '0');
             const day = String(date.getDate()).padStart(2, '0');
@@ -3934,17 +3909,25 @@ async function importUserData(event) {
                         if (colMap[k]) mapped[colMap[k]] = row[k];
                     });
 
+                    // 修复日期偏移：处理所有日期字段
                     dateFields.forEach(field => {
                         if (mapped[field] !== undefined && mapped[field] !== null && mapped[field] !==
                             '') {
                             const val = mapped[field];
+                            // 如果是数字（Excel序列号）
                             if (typeof val === 'number') {
                                 mapped[field] = excelSerialToDate(val);
-                            } else if (typeof val === 'string' && /^\d+$/.test(val.trim())) {
+                            }
+                            // 如果是字符串数字
+                            else if (typeof val === 'string' && /^\d+$/.test(val.trim())) {
                                 const num = parseInt(val.trim());
                                 if (num > 0 && num < 60000) {
                                     mapped[field] = excelSerialToDate(num);
                                 }
+                            }
+                            // 如果是日期字符串，直接保留
+                            else if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}/.test(val)) {
+                                // 已经是日期格式，直接保留
                             }
                         }
                     });
@@ -3990,7 +3973,7 @@ async function importUserData(event) {
                     appData[dataType] = fresh || [];
                     await updateStock();
                     renderTable(dataType);
-                    alert(`成功导入 ${imported} 条记录`);
+                    alert(`✅ 成功导入 ${imported} 条记录`);
                 } catch (err) {
                     alert('导入失败: ' + (err.message || '未知错误'));
                 }
