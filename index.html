@@ -516,6 +516,10 @@
             color: #555;
             margin-bottom: 5px;
         }
+        .form-item label .required {
+            color: #e94560;
+            margin-left: 2px;
+        }
         .form-item input,
         .form-item select,
         .form-item textarea {
@@ -1177,7 +1181,8 @@
             </div>
             <div class="sidebar-bottom">
                 <div class="menu-user" onclick="showPage('profile')">👤 个人中心</div>
-                <div class="version-info">灿然科技管理系统 V1.0.18<br>灿然科技×古洛尼（绵阳）</div>
+                <!-- [修改] 版本号 V1.0.18 → V2.0.2 -->
+                <div class="version-info">灿然科技管理系统 V2.0.2<br>灿然科技×古洛尼（绵阳）</div>
             </div>
         </div>
 
@@ -2459,9 +2464,11 @@
 
             let formHtml = '<div class="form-grid">';
             fields.forEach(f => {
+                const required = (dataType === 'productInfo' && (f === 'brand' || f === 'goodsName' || f ===
+                'model'));
                 formHtml += `
                     <div class="form-item">
-                        <label>${labelMap[f] || f}</label>
+                        <label>${labelMap[f] || f}${required ? '<span class="required">*</span>' : ''}</label>
                         <input id="bf_${f}" placeholder="请输入${labelMap[f] || f}">
                     </div>
                 `;
@@ -2535,9 +2542,11 @@
 
             let formHtml = '<div class="form-grid">';
             fields.forEach(f => {
+                const required = (dataType === 'productInfo' && (f === 'brand' || f === 'goodsName' || f ===
+                'model'));
                 formHtml += `
                     <div class="form-item">
-                        <label>${labelMap[f] || f}</label>
+                        <label>${labelMap[f] || f}${required ? '<span class="required">*</span>' : ''}</label>
                         <input id="bf_${f}" value="${row[f] || ''}" placeholder="请输入${labelMap[f] || f}">
                     </div>
                 `;
@@ -3038,7 +3047,7 @@
                 </div>
                 <div class="form-item"><label>采购日期</label><input id="f_purchaseDate" type="date"></div>
                 <div class="form-item"><label>收货日期</label><input id="f_receiveDate" type="date"></div>
-                <div class="form-item"><label>商品品牌</label>
+                <div class="form-item"><label>商品品牌 <span class="required">*</span></label>
                     <input list="f_brand_list" id="f_brand" placeholder="请输入或选择" oninput="onBrandInput('purchase')">
                     <datalist id="f_brand_list">${brandOpts}</datalist>
                 </div>
@@ -3058,7 +3067,7 @@
                 </div>
                 <div class="form-item"><label>开票金额</label><input id="f_invoiceAmount" type="number" step="0.01"></div>
                 <div class="form-item"><label>开票日期</label><input id="f_invoiceDate" type="date"></div>
-                <div class="form-item"><label>归属仓库</label>
+                <div class="form-item"><label>归属仓库 <span class="required">*</span></label>
                     <select id="f_warehouse">
                         <option value="新库房">新库房</option>
                         <option value="老库房">老库房</option>
@@ -3092,7 +3101,7 @@
                 <div class="form-item"><label>销售渠道</label>
                     <input id="f_channel" placeholder="输入销售渠道">
                 </div>
-                <div class="form-item"><label>商品品牌</label>
+                <div class="form-item"><label>商品品牌 <span class="required">*</span></label>
                     <input list="f_brand_list" id="f_brand" placeholder="请输入或选择" oninput="onBrandInput('retail')">
                     <datalist id="f_brand_list">${brandOpts}</datalist>
                 </div>
@@ -3156,7 +3165,7 @@
                 <div class="form-item"><label>利润</label><input id="f_profit" readonly></div>
                 <div class="form-item"></div>
 
-                <div class="form-item"><label>归属仓库</label>
+                <div class="form-item"><label>归属仓库 <span class="required">*</span></label>
                     <select id="f_warehouse">
                         <option value="新库房">新库房</option>
                         <option value="老库房">老库房</option>
@@ -3208,7 +3217,7 @@
                 <div class="form-item"><label>单号</label><input id="f_orderNo" readonly></div>
                 <div class="form-item"><label>上样门店地址</label><input id="f_storeAddress"></div>
                 <div class="form-item"><label>上样日期</label><input id="f_displayDate" type="date"></div>
-                <div class="form-item"><label>商品品牌</label>
+                <div class="form-item"><label>商品品牌 <span class="required">*</span></label>
                     <input list="f_brand_list" id="f_brand" placeholder="请输入或选择" oninput="onBrandInput('sample')">
                     <datalist id="f_brand_list">${brandOpts}</datalist>
                 </div>
@@ -3280,7 +3289,7 @@
                 <div class="form-item"><label>开票日期</label><input id="f_invoiceDate" type="date"></div>
                 <div class="form-item"><label>进货价</label><input id="f_costPrice" type="number" step="0.01"></div>
                 <div class="form-item"><label>利润</label><input id="f_profit" readonly></div>
-                <div class="form-item"><label>归属仓库</label>
+                <div class="form-item"><label>归属仓库 <span class="required">*</span></label>
                     <select id="f_warehouse">
                         <option value="新库房">新库房</option>
                         <option value="老库房">老库房</option>
@@ -3413,8 +3422,31 @@
             `;
         }
 
+        // [修改] saveRow 增加品牌和仓库必填验证（三维匹配需要）
         async function saveRow(dataType) {
             const row = collectFormData();
+
+            // ---- 品牌必填验证（适用于有 brand 字段的单据类型） ----
+            const brandRequiredTypes = ['purchaseIn', 'purchaseExchange', 'purchaseReturn', 'retailOrder', 'retailSell',
+                'retailExchange', 'retailReturn', 'sampleDisplay'
+            ];
+            if (brandRequiredTypes.includes(dataType)) {
+                if (!row.brand || row.brand.trim() === '') {
+                    alert('请填写商品品牌（必填）');
+                    return;
+                }
+            }
+
+            // ---- 仓库必填验证（适用于有 warehouse 字段的单据类型） ----
+            const warehouseRequiredTypes = ['purchaseIn', 'purchaseExchange', 'purchaseReturn', 'retailOrder', 'retailSell',
+                'retailExchange', 'retailReturn', 'sampleSell'
+            ];
+            if (warehouseRequiredTypes.includes(dataType)) {
+                if (!row.warehouse || row.warehouse.trim() === '') {
+                    alert('请选择归属仓库（必填）');
+                    return;
+                }
+            }
 
             if (row.quantity && row.price) row.amount = (row.quantity * row.price).toFixed(2);
             if (row.sellPrice && row.retailPrice) row.discount = (row.sellPrice / row.retailPrice).toFixed(2);
@@ -3434,8 +3466,30 @@
             }
         }
 
+        // [修改] updateRow 增加品牌和仓库必填验证（三维匹配需要）
         async function updateRow(dataType, idx) {
             const row = collectFormData();
+
+            const brandRequiredTypes = ['purchaseIn', 'purchaseExchange', 'purchaseReturn', 'retailOrder', 'retailSell',
+                'retailExchange', 'retailReturn', 'sampleDisplay'
+            ];
+            if (brandRequiredTypes.includes(dataType)) {
+                if (!row.brand || row.brand.trim() === '') {
+                    alert('请填写商品品牌（必填）');
+                    return;
+                }
+            }
+
+            const warehouseRequiredTypes = ['purchaseIn', 'purchaseExchange', 'purchaseReturn', 'retailOrder', 'retailSell',
+                'retailExchange', 'retailReturn', 'sampleSell'
+            ];
+            if (warehouseRequiredTypes.includes(dataType)) {
+                if (!row.warehouse || row.warehouse.trim() === '') {
+                    alert('请选择归属仓库（必填）');
+                    return;
+                }
+            }
+
             if (row.quantity && row.price) row.amount = (row.quantity * row.price).toFixed(2);
             if (row.sellPrice && row.retailPrice) row.discount = (row.sellPrice / row.retailPrice).toFixed(2);
             if (row.sellPrice && row.costPrice) row.profit = (row.sellPrice - row.costPrice).toFixed(2);
@@ -3628,23 +3682,29 @@
         }
 
         // ===================================================================
-        // 8. 库存自动更新（按型号合并）
+        // 8. 库存自动更新（三维匹配：品牌+型号+仓库）
+        // [修改] 核心改动：从仅型号匹配 → 品牌+型号+仓库 三维匹配
         // ===================================================================
         async function updateStock() {
             const stockMap = {};
 
+            // [修改] 三维匹配键：品牌 + '|' + 型号 + '|' + 仓库
             function getStockKey(item) {
-                return item.model || '无型号';
+                const brand = item.brand || '无品牌';
+                const model = item.model || '无型号';
+                const warehouse = item.warehouse || '新库房';
+                return brand + '|' + model + '|' + warehouse;
             }
 
+            // ---- 采购入库：增加库存 ----
             (appData.purchaseIn || []).forEach(item => {
                 const key = getStockKey(item);
                 if (!stockMap[key]) {
                     stockMap[key] = {
-                        brand: item.brand || '',
+                        brand: item.brand || '无品牌',
                         goodsName: item.goodsName || '',
-                        model: item.model || '',
-                        warehouse: '全部',
+                        model: item.model || '无型号',
+                        warehouse: item.warehouse || '新库房',
                         bookStock: 0,
                         salesOrder: 0
                     };
@@ -3652,14 +3712,15 @@
                 stockMap[key].bookStock += Number(item.quantity) || 0;
             });
 
+            // ---- 采购退货：减少库存 ----
             (appData.purchaseReturn || []).forEach(item => {
                 const key = getStockKey(item);
                 if (!stockMap[key]) {
                     stockMap[key] = {
-                        brand: item.brand || '',
+                        brand: item.brand || '无品牌',
                         goodsName: item.goodsName || '',
-                        model: item.model || '',
-                        warehouse: '全部',
+                        model: item.model || '无型号',
+                        warehouse: item.warehouse || '新库房',
                         bookStock: 0,
                         salesOrder: 0
                     };
@@ -3667,14 +3728,15 @@
                 stockMap[key].bookStock -= Number(item.quantity) || 0;
             });
 
+            // ---- 零售订单：减少库存（三维匹配） ----
             (appData.retailOrder || []).forEach(item => {
                 const key = getStockKey(item);
                 if (!stockMap[key]) {
                     stockMap[key] = {
-                        brand: item.brand || '',
+                        brand: item.brand || '无品牌',
                         goodsName: item.goodsName || '',
-                        model: item.model || '',
-                        warehouse: '全部',
+                        model: item.model || '无型号',
+                        warehouse: item.warehouse || '新库房',
                         bookStock: 0,
                         salesOrder: 0
                     };
@@ -3682,14 +3744,15 @@
                 stockMap[key].bookStock -= 1;
             });
 
+            // ---- 零售开单：减少库存（三维匹配） ----
             (appData.retailSell || []).forEach(item => {
                 const key = getStockKey(item);
                 if (!stockMap[key]) {
                     stockMap[key] = {
-                        brand: item.brand || '',
+                        brand: item.brand || '无品牌',
                         goodsName: item.goodsName || '',
-                        model: item.model || '',
-                        warehouse: '全部',
+                        model: item.model || '无型号',
+                        warehouse: item.warehouse || '新库房',
                         bookStock: 0,
                         salesOrder: 0
                     };
@@ -3697,29 +3760,31 @@
                 stockMap[key].bookStock -= 1;
             });
 
+            // ---- 零售退货：增加库存（三维匹配） ----
             (appData.retailReturn || []).forEach(item => {
                 const key = getStockKey(item);
                 if (!stockMap[key]) {
                     stockMap[key] = {
-                        brand: item.brand || '',
+                        brand: item.brand || '无品牌',
                         goodsName: item.goodsName || '',
-                        model: item.model || '',
-                        warehouse: '全部',
+                        model: item.model || '无型号',
+                        warehouse: item.warehouse || '新库房',
                         bookStock: 0,
                         salesOrder: 0
                     };
                 }
-                stockMap[key].bookStock -= 1;
+                stockMap[key].bookStock += 1;
             });
 
+            // ---- 门店上样：减少库存（三维匹配） ----
             (appData.sampleDisplay || []).forEach(item => {
                 const key = getStockKey(item);
                 if (!stockMap[key]) {
                     stockMap[key] = {
-                        brand: item.brand || '',
+                        brand: item.brand || '无品牌',
                         goodsName: item.goodsName || '',
-                        model: item.model || '',
-                        warehouse: '全部',
+                        model: item.model || '无型号',
+                        warehouse: item.warehouse || '新库房',
                         bookStock: 0,
                         salesOrder: 0
                     };
@@ -3727,6 +3792,23 @@
                 stockMap[key].bookStock -= Number(item.quantity) || 0;
             });
 
+            // ---- 样机销售：减少库存（三维匹配） ----
+            (appData.sampleSell || []).forEach(item => {
+                const key = getStockKey(item);
+                if (!stockMap[key]) {
+                    stockMap[key] = {
+                        brand: item.brand || '无品牌',
+                        goodsName: item.goodsName || '',
+                        model: item.model || '无型号',
+                        warehouse: item.warehouse || '新库房',
+                        bookStock: 0,
+                        salesOrder: 0
+                    };
+                }
+                stockMap[key].bookStock -= 1;
+            });
+
+            // ---- 销售订货量（按三维匹配汇总零售订单） ----
             const salesOrderMap = {};
             (appData.retailOrder || []).forEach(item => {
                 const key = getStockKey(item);
@@ -3737,24 +3819,20 @@
                 if (stockMap[key]) {
                     stockMap[key].salesOrder = salesOrderMap[key];
                 } else {
-                    let foundItem = null;
-                    for (const order of (appData.retailOrder || [])) {
-                        if (getStockKey(order) === key) {
-                            foundItem = order;
-                            break;
-                        }
-                    }
+                    // 如果库存中没有该三维组合，创建一条记录
+                    const parts = key.split('|');
                     stockMap[key] = {
-                        brand: foundItem ? foundItem.brand || '' : '',
-                        goodsName: foundItem ? foundItem.goodsName || '' : '',
-                        model: key === '无型号' ? '' : key,
-                        warehouse: '全部',
+                        brand: parts[0] || '无品牌',
+                        goodsName: '',
+                        model: parts[1] || '无型号',
+                        warehouse: parts[2] || '新库房',
                         bookStock: 0,
                         salesOrder: salesOrderMap[key]
                     };
                 }
             });
 
+            // ---- 生成最终库存数组 ----
             appData.stock = Object.values(stockMap).map(s => ({
                 ...s,
                 availableStock: s.bookStock - s.salesOrder
@@ -3764,19 +3842,21 @@
         }
 
         // ===================================================================
-        // 9. Excel 导入
+        // 9. Excel 导入（含品牌/仓库必填验证）
         // ===================================================================
         function importExcel(dataType) {
             document.getElementById('file-import').click();
         }
 
+        // [修改] 日期转换：基准日期从 1899-12-30 改为 1899-12-31，修复WPS日期偏移
         function excelSerialToDate(serial) {
             if (typeof serial !== 'number' || serial < 0 || serial > 60000) return serial;
             let days = serial;
             if (serial >= 61) {
                 days = serial - 1;
             }
-            const epoch = new Date(1899, 11, 30);
+            // 修改基准日期：1899-12-31（兼容WPS/微软Excel）
+            const epoch = new Date(1899, 11, 31);
             const date = new Date(epoch.getTime() + days * 86400000);
             const year = date.getFullYear();
             const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -3784,6 +3864,7 @@
             return `${year}-${month}-${day}`;
         }
 
+        // [修改] handleFileImport 增加品牌和仓库必填验证（三维匹配需要）
         async function handleFileImport(dataType) {
             const file = event.target.files[0];
             if (!file) return;
@@ -3813,11 +3894,34 @@
                 }
 
                 let imported = 0;
+                let skipped = 0;
                 json.forEach(row => {
                     const mapped = {};
                     Object.keys(row).forEach(k => {
                         if (colMap[k]) mapped[colMap[k]] = row[k];
                     });
+
+                    // ---- 品牌必填验证 ----
+                    const brandRequiredTypes = ['purchaseIn', 'purchaseExchange', 'purchaseReturn', 'retailOrder',
+                        'retailSell', 'retailExchange', 'retailReturn', 'sampleDisplay'
+                    ];
+                    if (brandRequiredTypes.includes(dataType)) {
+                        if (!mapped.brand || mapped.brand.toString().trim() === '') {
+                            skipped++;
+                            return;
+                        }
+                    }
+
+                    // ---- 仓库必填验证 ----
+                    const warehouseRequiredTypes = ['purchaseIn', 'purchaseExchange', 'purchaseReturn', 'retailOrder',
+                        'retailSell', 'retailExchange', 'retailReturn', 'sampleSell'
+                    ];
+                    if (warehouseRequiredTypes.includes(dataType)) {
+                        if (!mapped.warehouse || mapped.warehouse.toString().trim() === '') {
+                            skipped++;
+                            return;
+                        }
+                    }
 
                     dateFields.forEach(field => {
                         if (mapped[field] !== undefined && mapped[field] !== null && mapped[field] !==
@@ -3866,7 +3970,9 @@
                 await saveAppData();
                 await updateStock();
                 renderTable(dataType);
-                alert(`成功导入 ${imported} 条记录`);
+                let msg = `成功导入 ${imported} 条记录`;
+                if (skipped > 0) msg += `，跳过 ${skipped} 条（缺少品牌或仓库）`;
+                alert(msg);
             };
             reader.readAsArrayBuffer(file);
             event.target.value = '';
