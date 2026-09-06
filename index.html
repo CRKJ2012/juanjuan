@@ -1181,7 +1181,6 @@
             </div>
             <div class="sidebar-bottom">
                 <div class="menu-user" onclick="showPage('profile')">👤 个人中心</div>
-                <!-- [修改] 版本号 V1.0.18 → V2.0.2 -->
                 <div class="version-info">灿然科技管理系统 V2.0.2<br>灿然科技×古洛尼（绵阳）</div>
             </div>
         </div>
@@ -3422,11 +3421,9 @@
             `;
         }
 
-        // [修改] saveRow 增加品牌和仓库必填验证（三维匹配需要）
         async function saveRow(dataType) {
             const row = collectFormData();
 
-            // ---- 品牌必填验证（适用于有 brand 字段的单据类型） ----
             const brandRequiredTypes = ['purchaseIn', 'purchaseExchange', 'purchaseReturn', 'retailOrder', 'retailSell',
                 'retailExchange', 'retailReturn', 'sampleDisplay'
             ];
@@ -3437,7 +3434,6 @@
                 }
             }
 
-            // ---- 仓库必填验证（适用于有 warehouse 字段的单据类型） ----
             const warehouseRequiredTypes = ['purchaseIn', 'purchaseExchange', 'purchaseReturn', 'retailOrder', 'retailSell',
                 'retailExchange', 'retailReturn', 'sampleSell'
             ];
@@ -3466,7 +3462,6 @@
             }
         }
 
-        // [修改] updateRow 增加品牌和仓库必填验证（三维匹配需要）
         async function updateRow(dataType, idx) {
             const row = collectFormData();
 
@@ -3683,12 +3678,10 @@
 
         // ===================================================================
         // 8. 库存自动更新（三维匹配：品牌+型号+仓库）
-        // [修改] 核心改动：从仅型号匹配 → 品牌+型号+仓库 三维匹配
         // ===================================================================
         async function updateStock() {
             const stockMap = {};
 
-            // [修改] 三维匹配键：品牌 + '|' + 型号 + '|' + 仓库
             function getStockKey(item) {
                 const brand = item.brand || '无品牌';
                 const model = item.model || '无型号';
@@ -3728,7 +3721,7 @@
                 stockMap[key].bookStock -= Number(item.quantity) || 0;
             });
 
-            // ---- 零售订单：减少库存（三维匹配） ----
+            // ---- 零售订单：减少库存 ----
             (appData.retailOrder || []).forEach(item => {
                 const key = getStockKey(item);
                 if (!stockMap[key]) {
@@ -3744,7 +3737,7 @@
                 stockMap[key].bookStock -= 1;
             });
 
-            // ---- 零售开单：减少库存（三维匹配） ----
+            // ---- 零售开单：减少库存 ----
             (appData.retailSell || []).forEach(item => {
                 const key = getStockKey(item);
                 if (!stockMap[key]) {
@@ -3760,7 +3753,7 @@
                 stockMap[key].bookStock -= 1;
             });
 
-            // ---- 零售退货：增加库存（三维匹配） ----
+            // ---- 零售退货：增加库存 ----
             (appData.retailReturn || []).forEach(item => {
                 const key = getStockKey(item);
                 if (!stockMap[key]) {
@@ -3776,7 +3769,7 @@
                 stockMap[key].bookStock += 1;
             });
 
-            // ---- 门店上样：减少库存（三维匹配） ----
+            // ---- 门店上样：减少库存 ----
             (appData.sampleDisplay || []).forEach(item => {
                 const key = getStockKey(item);
                 if (!stockMap[key]) {
@@ -3792,7 +3785,7 @@
                 stockMap[key].bookStock -= Number(item.quantity) || 0;
             });
 
-            // ---- 样机销售：减少库存（三维匹配） ----
+            // ---- 样机销售：减少库存 ----
             (appData.sampleSell || []).forEach(item => {
                 const key = getStockKey(item);
                 if (!stockMap[key]) {
@@ -3819,7 +3812,6 @@
                 if (stockMap[key]) {
                     stockMap[key].salesOrder = salesOrderMap[key];
                 } else {
-                    // 如果库存中没有该三维组合，创建一条记录
                     const parts = key.split('|');
                     stockMap[key] = {
                         brand: parts[0] || '无品牌',
@@ -3842,20 +3834,24 @@
         }
 
         // ===================================================================
-        // 9. Excel 导入（含品牌/仓库必填验证）
+        // 9. Excel 导入（含品牌/仓库必填验证，以及WPS日期+2天修正）
         // ===================================================================
         function importExcel(dataType) {
             document.getElementById('file-import').click();
         }
 
-        // [修改] 日期转换：基准日期从 1899-12-30 改为 1899-12-31，修复WPS日期偏移
+        /**
+         * 将Excel日期序列号转为 yyyy-MM-dd 格式
+         * 【核心修改】WPS导出的日期比标准Excel早2天，这里加2天补偿
+         */
         function excelSerialToDate(serial) {
             if (typeof serial !== 'number' || serial < 0 || serial > 60000) return serial;
             let days = serial;
             if (serial >= 61) {
                 days = serial - 1;
             }
-            // 修改基准日期：1899-12-31（兼容WPS/微软Excel）
+            // ★★★ WPS日期修正：加2天补偿 ★★★
+            days = days + 1;
             const epoch = new Date(1899, 11, 31);
             const date = new Date(epoch.getTime() + days * 86400000);
             const year = date.getFullYear();
@@ -3864,7 +3860,6 @@
             return `${year}-${month}-${day}`;
         }
 
-        // [修改] handleFileImport 增加品牌和仓库必填验证（三维匹配需要）
         async function handleFileImport(dataType) {
             const file = event.target.files[0];
             if (!file) return;
