@@ -2114,9 +2114,10 @@
                                 <input type="password" id="profile-confirm-pwd" placeholder="再次输入新密码">
                             </div>
                         </div>
-                        <div style="margin-top:4px;">
+                        <div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
                             <button class="btn btn-danger" onclick="logout()">🚪 退出登录</button>
-                            <span style="font-size:12px;color:#999;margin-left:12px;">退出后需要重新登录</span>
+                            <button class="btn btn-danger" onclick="deleteAccount()" style="background:#c0392b;">🗑️ 注销账号</button>
+                            <span style="font-size:12px;color:#999;">注销后将永久删除账号及所有数据，请谨慎操作</span>
                         </div>
                     </div>
 
@@ -2201,6 +2202,51 @@
             await saveAppData();
             alert('✅ 资料更新成功！');
             renderProfile();
+        }
+
+        // ===================================================================
+        // 注销账号功能
+        // ===================================================================
+        async function deleteAccount() {
+            const user = appData.currentUser;
+            if (!user) { alert('未登录'); return; }
+
+            if (!confirm(`⚠️ 确定要永久注销账号 "${user}" 吗？\n\n此操作将：\n1. 删除该账号的所有数据\n2. 删除该账号的所有操作日志\n3. 该账号将无法恢复\n\n请确认是否继续？`)) {
+                return;
+            }
+
+            if (!confirm(`⚠️ 再次确认：真的要注销账号 "${user}" 吗？此操作不可撤销！`)) {
+                return;
+            }
+
+            try {
+                // 删除用户数据
+                delete appData.users[user];
+                // 删除用户日志
+                delete appData.userLogs[user];
+
+                // 如果当前用户就是该账号，清除当前用户状态
+                if (appData.currentUser === user) {
+                    appData.currentUser = null;
+                }
+
+                await saveAppData();
+
+                alert(`✅ 账号 "${user}" 已成功注销`);
+
+                // 退出到登录页
+                document.getElementById('main-system').style.display = 'none';
+                document.getElementById('auth-screen').style.display = 'flex';
+                sessionStorage.setItem('gorenje_remember', '0');
+                localStorage.removeItem('gorenje_last_user');
+
+                // 清空登录表单
+                document.getElementById('login-username').value = '';
+                document.getElementById('login-password').value = '';
+
+            } catch (err) {
+                alert('❌ 注销失败：' + err.message);
+            }
         }
 
         function filterUserLogs() {
@@ -3421,9 +3467,11 @@
             `;
         }
 
+        // [修改] saveRow 增加品牌和仓库必填验证（三维匹配需要）
         async function saveRow(dataType) {
             const row = collectFormData();
 
+            // ---- 品牌必填验证（适用于有 brand 字段的单据类型） ----
             const brandRequiredTypes = ['purchaseIn', 'purchaseExchange', 'purchaseReturn', 'retailOrder', 'retailSell',
                 'retailExchange', 'retailReturn', 'sampleDisplay'
             ];
@@ -3434,6 +3482,7 @@
                 }
             }
 
+            // ---- 仓库必填验证（适用于有 warehouse 字段的单据类型） ----
             const warehouseRequiredTypes = ['purchaseIn', 'purchaseExchange', 'purchaseReturn', 'retailOrder', 'retailSell',
                 'retailExchange', 'retailReturn', 'sampleSell'
             ];
@@ -3462,6 +3511,7 @@
             }
         }
 
+        // [修改] updateRow 增加品牌和仓库必填验证（三维匹配需要）
         async function updateRow(dataType, idx) {
             const row = collectFormData();
 
@@ -3678,6 +3728,7 @@
 
         // ===================================================================
         // 8. 库存自动更新（三维匹配：品牌+型号+仓库）
+        // 【修改】零售订单和零售开单根据数量（quantity）扣减库存，而不是固定减1
         // ===================================================================
         async function updateStock() {
             const stockMap = {};
@@ -3721,7 +3772,7 @@
                 stockMap[key].bookStock -= Number(item.quantity) || 0;
             });
 
-            // ---- 零售订单：减少库存 ----
+            // ---- 零售订单：减少库存（按数量扣减） ----
             (appData.retailOrder || []).forEach(item => {
                 const key = getStockKey(item);
                 if (!stockMap[key]) {
@@ -3734,10 +3785,12 @@
                         salesOrder: 0
                     };
                 }
-                stockMap[key].bookStock -= 1;
+                // ★★★ 按数量扣减，默认为1 ★★★
+                const qty = Number(item.quantity) || 1;
+                stockMap[key].bookStock -= qty;
             });
 
-            // ---- 零售开单：减少库存 ----
+            // ---- 零售开单：减少库存（按数量扣减） ----
             (appData.retailSell || []).forEach(item => {
                 const key = getStockKey(item);
                 if (!stockMap[key]) {
@@ -3750,10 +3803,12 @@
                         salesOrder: 0
                     };
                 }
-                stockMap[key].bookStock -= 1;
+                // ★★★ 按数量扣减，默认为1 ★★★
+                const qty = Number(item.quantity) || 1;
+                stockMap[key].bookStock -= qty;
             });
 
-            // ---- 零售退货：增加库存 ----
+            // ---- 零售退货：增加库存（按数量增加） ----
             (appData.retailReturn || []).forEach(item => {
                 const key = getStockKey(item);
                 if (!stockMap[key]) {
@@ -3766,7 +3821,8 @@
                         salesOrder: 0
                     };
                 }
-                stockMap[key].bookStock += 1;
+                const qty = Number(item.quantity) || 1;
+                stockMap[key].bookStock += qty;
             });
 
             // ---- 门店上样：减少库存 ----
@@ -3801,12 +3857,13 @@
                 stockMap[key].bookStock -= 1;
             });
 
-            // ---- 销售订货量（按三维匹配汇总零售订单） ----
+            // ---- 销售订货量（按三维匹配汇总零售订单，按数量汇总） ----
             const salesOrderMap = {};
             (appData.retailOrder || []).forEach(item => {
                 const key = getStockKey(item);
                 if (!salesOrderMap[key]) salesOrderMap[key] = 0;
-                salesOrderMap[key] += 1;
+                const qty = Number(item.quantity) || 1;
+                salesOrderMap[key] += qty;
             });
             Object.keys(salesOrderMap).forEach(key => {
                 if (stockMap[key]) {
@@ -3851,7 +3908,7 @@
                 days = serial - 1;
             }
             // ★★★ WPS日期修正：加2天补偿 ★★★
-            days = days + 1;
+            days = days + 2;
             const epoch = new Date(1899, 11, 31);
             const date = new Date(epoch.getTime() + days * 86400000);
             const year = date.getFullYear();
@@ -4414,6 +4471,7 @@
         window.exportUserData = exportUserData;
         window.importUserData = importUserData;
         window.exportDashboardExcel = exportDashboardExcel;
+        window.deleteAccount = deleteAccount;
     </script>
 </body>
 </html>
