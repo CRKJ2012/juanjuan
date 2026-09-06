@@ -576,6 +576,34 @@
             color: #888;
             padding: 0 5px;
         }
+        .exchange-fieldset {
+            border: 2px solid #e94560;
+            border-radius: 4px;
+            padding: 10px 15px;
+            margin-top: 5px;
+            background: #fff8f9;
+        }
+        .exchange-fieldset legend {
+            font-size: 14px;
+            color: #e94560;
+            padding: 0 8px;
+            font-weight: 600;
+        }
+        .exchange-fieldset .form-grid {
+            grid-template-columns: repeat(3, 1fr);
+        }
+        .exchange-out {
+            border-color: #e74c3c;
+        }
+        .exchange-out legend {
+            color: #e74c3c;
+        }
+        .exchange-in {
+            border-color: #27ae60;
+        }
+        .exchange-in legend {
+            color: #27ae60;
+        }
 
         .action-btn {
             padding: 4px 8px;
@@ -593,6 +621,14 @@
         .action-btn.delete {
             color: #e74c3c;
             border-color: #e74c3c;
+        }
+        .action-btn.view {
+            color: #3498db;
+            border-color: #3498db;
+        }
+        .action-btn.view:hover {
+            background: #3498db;
+            color: #fff;
         }
 
         /* 导出配置 */
@@ -1043,6 +1079,9 @@
             .profile-info .profile-sub span {
                 display: block;
                 margin-bottom: 4px;
+            }
+            .exchange-fieldset .form-grid {
+                grid-template-columns: 1fr;
             }
         }
         @media (max-width: 480px) {
@@ -1644,9 +1683,9 @@
                 totalDebt = 0,
                 totalPosAmount = 0,
                 totalSubsidy = 0;
-            let totalCostPrice = 0; // 销售单的进货总成本
-            let totalSalesAmount = 0; // 销售单的销售总金额
-            let totalRetailPrice = 0; // 所有订单的零售价总和（用于卡片展示）
+            let totalCostPrice = 0;
+            let totalSalesAmount = 0;
+            let totalRetailPrice = 0;
             let totalProfit = 0;
 
             // 遍历计算
@@ -1742,7 +1781,6 @@
                 { label: '欠款金额', value: totalDebt, icon: '📉', color: 'card-color-6', format: 'currency' },
                 { label: 'POS机交易金额', value: totalPosAmount, icon: '💳', color: 'card-color-7', format: 'currency' },
                 { label: '国补金额', value: totalSubsidy, icon: '🎯', color: 'card-color-8', format: 'currency' },
-                // ★ 毛利金额（销售金额 - 进货成本）
                 { label: '毛利金额', value: totalProfit, icon: '📈', color: 'card-color-9', format: 'currency' },
                 { label: '毛利率', value: grossMarginRate, icon: '📊', color: 'card-color-12', format: 'percent' },
                 { label: '入库金额（净）', value: netPurchaseAmount, icon: '🏢', color: 'card-color-10', format: 'currency' }
@@ -1773,14 +1811,13 @@
         }
 
         // ===================================================================
-        // 5b. 数据看板导出Excel（同步修改毛利计算）
+        // 5b. 数据看板导出Excel
         // ===================================================================
         function exportDashboardExcel() {
             const start = document.getElementById('dashboard-start')?.value || '';
             const end = document.getElementById('dashboard-end')?.value || '';
             const brandFilter = document.getElementById('dashboard-brand-filter')?.value || '';
 
-            // 收集所有零售数据
             const retailTypes = ['retailOrder', 'retailSell', 'retailExchange', 'retailReturn'];
             let allOrders = [];
             retailTypes.forEach(type => {
@@ -1790,7 +1827,6 @@
                 });
             });
 
-            // 按日期筛选
             let filtered = allOrders;
             if (start && end) {
                 filtered = filtered.filter(item => {
@@ -1803,7 +1839,6 @@
                 filtered = filtered.filter(item => (item.orderDate || '') <= end);
             }
 
-            // 计算汇总数据
             let totalOrders = filtered.length;
             let returnOrders = filtered.filter(item => item._type === 'retailReturn').length;
             let salesOrders = filtered.filter(item => item._type === 'retailOrder' || item._type === 'retailSell').length;
@@ -1844,7 +1879,6 @@
                 grossMarginRate = (totalProfit / totalSellAmount) * 100;
             }
 
-            // ---- 入库数据 ----
             let purchaseItems = appData.purchaseIn || [];
             if (start && end) {
                 purchaseItems = purchaseItems.filter(item => {
@@ -1886,10 +1920,8 @@
             });
             const netPurchaseAmount = totalPurchaseAmount - totalReturnAmount;
 
-            // ---- 构建Excel数据 ----
             const wb = XLSX.utils.book_new();
 
-            // Sheet1: 汇总数据
             const summaryData = [
                 ['指标', '数值'],
                 ['总订单数', totalOrders],
@@ -1916,7 +1948,6 @@
             ws1['!cols'] = [{ wch: 20 }, { wch: 20 }];
             XLSX.utils.book_append_sheet(wb, ws1, '汇总');
 
-            // Sheet2: 订单明细
             if (filtered.length > 0) {
                 const retailCols = [
                     { key: '_type', label: '订单类型' },
@@ -2204,9 +2235,6 @@
             renderProfile();
         }
 
-        // ===================================================================
-        // 注销账号功能
-        // ===================================================================
         async function deleteAccount() {
             const user = appData.currentUser;
             if (!user) { alert('未登录'); return; }
@@ -2220,12 +2248,9 @@
             }
 
             try {
-                // 删除用户数据
                 delete appData.users[user];
-                // 删除用户日志
                 delete appData.userLogs[user];
 
-                // 如果当前用户就是该账号，清除当前用户状态
                 if (appData.currentUser === user) {
                     appData.currentUser = null;
                 }
@@ -2234,13 +2259,11 @@
 
                 alert(`✅ 账号 "${user}" 已成功注销`);
 
-                // 退出到登录页
                 document.getElementById('main-system').style.display = 'none';
                 document.getElementById('auth-screen').style.display = 'flex';
                 sessionStorage.setItem('gorenje_remember', '0');
                 localStorage.removeItem('gorenje_last_user');
 
-                // 清空登录表单
                 document.getElementById('login-username').value = '';
                 document.getElementById('login-password').value = '';
 
@@ -2942,11 +2965,29 @@
                 { key: 'warehouse', label: '归属仓库' },
                 { key: 'remark', label: '备注' }
             ],
+            retailExchange: [
+                { key: 'orderNo', label: '单号' },
+                { key: 'orderDate', label: '换货日期' },
+                { key: 'customer', label: '客户姓名' },
+                { key: 'phone', label: '联系电话' },
+                { key: 'outBrand', label: '换出-品牌' },
+                { key: 'outGoodsName', label: '换出-商品名称' },
+                { key: 'outModel', label: '换出-型号' },
+                { key: 'outQuantity', label: '换出-数量' },
+                { key: 'inBrand', label: '换入-品牌' },
+                { key: 'inGoodsName', label: '换入-商品名称' },
+                { key: 'inModel', label: '换入-型号' },
+                { key: 'inQuantity', label: '换入-数量' },
+                { key: 'salesman', label: '销售人员' },
+                { key: 'warehouse', label: '归属仓库' },
+                { key: 'remark', label: '备注' }
+            ],
             stock: [
                 { key: 'brand', label: '商品品牌' }, { key: 'goodsName', label: '商品名称' },
                 { key: 'model', label: '商品型号' }, { key: 'bookStock', label: '账面库存' },
                 { key: 'salesOrder', label: '销售订货' }, { key: 'availableStock', label: '可用库存' },
-                { key: 'warehouse', label: '归属仓库' }
+                { key: 'warehouse', label: '归属仓库' },
+                { key: '_actions', label: '操作' }
             ],
             sampleDisplay: [
                 { key: 'orderNo', label: '单号' }, { key: 'storeAddress', label: '上样门店地址' },
@@ -2975,7 +3016,6 @@
         tableColumns.purchaseExchange = tableColumns.purchaseIn;
         tableColumns.purchaseReturn = tableColumns.purchaseIn;
         tableColumns.retailSell = tableColumns.retailOrder;
-        tableColumns.retailExchange = tableColumns.retailOrder;
         tableColumns.retailReturn = tableColumns.retailOrder;
 
         // ==================== 渲染表格 ====================
@@ -2995,11 +3035,22 @@
             let html = '<thead><tr>';
             html +=
                 `<th style="width:30px"><input type="checkbox" class="select-all-checkbox" onchange="toggleAllCheckboxes(this)"></th>`;
-            cols.forEach(c => html += `<th>${c.label}</th>`);
-            html += '<th style="width:100px">操作</th></tr></thead><tbody>';
+            cols.forEach(c => {
+                if (c.key === '_actions') {
+                    html += `<th style="width:80px">操作</th>`;
+                } else {
+                    html += `<th>${c.label}</th>`;
+                }
+            });
+            // 如果不是stock，加操作列
+            if (!isStock) {
+                html += '<th style="width:100px">操作</th>';
+            }
+            html += '</tr></thead><tbody>';
 
             if (data.length === 0) {
-                html += `<tr><td colspan="${cols.length + 2}" class="empty-tip">暂无数据，请新增或导入</td></tr>`;
+                const colCount = cols.length + (isStock ? 1 : 2);
+                html += `<tr><td colspan="${colCount}" class="empty-tip">暂无数据，请新增或导入</td></tr>`;
             } else {
                 data.forEach((row, idx) => {
                     const rawData = appData[dataType] || [];
@@ -3010,25 +3061,54 @@
                     html +=
                         `<td><input type="checkbox" class="row-checkbox" data-index="${editIdx}" onchange="updateBatchDeleteBtn()"></td>`;
                     cols.forEach(c => {
-                        let val = row[c.key] !== undefined && row[c.key] !== null ? row[c.key] : '';
-                        if (isStock && c.key === 'salesOrder' && val > 0) {
-                            const goodsName = row.goodsName || '';
-                            const brand = row.brand || '';
-                            const model = row.model || '';
-                            val =
-                                `<span class="clickable-number" onclick="jumpToRetailByProduct('${brand}','${goodsName}','${model}')">${val}</span>`;
+                        if (c.key === '_actions') {
+                            // 库存日报的查看开单按钮
+                            html += `<td>
+                                <button class="action-btn view" onclick="viewRetailSell('${row.brand || ''}','${row.model || ''}','${row.warehouse || ''}')">📋 查看开单</button>
+                            </td>`;
+                        } else {
+                            let val = row[c.key] !== undefined && row[c.key] !== null ? row[c.key] : '';
+                            html += `<td>${val}</td>`;
                         }
-                        html += `<td>${val}</td>`;
                     });
-                    html += `<td>
-                        <button class="action-btn edit" onclick="editRow('${dataType}', ${editIdx})">编辑</button>
-                        <button class="action-btn delete" onclick="deleteRow('${dataType}', ${editIdx})">删除</button>
-                    </td>`;
+                    if (!isStock) {
+                        html += `<td>
+                            <button class="action-btn edit" onclick="editRow('${dataType}', ${editIdx})">编辑</button>
+                            <button class="action-btn delete" onclick="deleteRow('${dataType}', ${editIdx})">删除</button>
+                        </td>`;
+                    }
                     html += '</tr>';
                 });
             }
             html += '</tbody>';
             table.innerHTML = html;
+        }
+
+        // ========== 查看零售开单 ==========
+        function viewRetailSell(brand, model, warehouse) {
+            // 跳转到零售开单页面，并自动筛选
+            showPage('retail-sell');
+            setTimeout(() => {
+                const brandInput = document.getElementById('filter-brand');
+                const modelInput = document.getElementById('filter-model');
+                const whFilter = document.getElementById('warehouse-filter');
+                if (brandInput) brandInput.value = brand || '';
+                if (modelInput) modelInput.value = model || '';
+                if (whFilter) whFilter.value = warehouse || '';
+                const dataType = 'retailSell';
+                renderTable(dataType);
+                // 高亮提示
+                const toolbar = document.querySelector('.toolbar');
+                if (toolbar) {
+                    toolbar.style.border = '3px solid #3498db';
+                    toolbar.style.borderRadius = '6px';
+                    toolbar.style.background = '#f0f8ff';
+                    setTimeout(() => {
+                        toolbar.style.border = '';
+                        toolbar.style.background = '';
+                    }, 4000);
+                }
+            }, 300);
         }
 
         function toggleAllCheckboxes(master) {
@@ -3129,6 +3209,79 @@
             const brandOpts = buildDatalistOptions(brands);
             const empOpts = buildDatalistOptions(employees);
 
+            // 如果是零售换货，使用专门的换货表单
+            if (dataType === 'retailExchange') {
+                return `
+            <div class="form-grid">
+                <div class="form-item"><label>单号</label><input id="f_orderNo" readonly></div>
+                <div class="form-item"><label>换货日期</label><input id="f_orderDate" type="date"></div>
+                <div class="form-item"><label>客户姓名</label><input id="f_customer"></div>
+                <div class="form-item"><label>联系电话</label><input id="f_phone" placeholder="输入手机号自动带出历史信息"></div>
+                <div class="form-item"><label>销售人员</label>
+                    <input list="f_salesman_list" id="f_salesman" placeholder="请输入或选择">
+                    <datalist id="f_salesman_list">${empOpts}</datalist>
+                </div>
+                <div class="form-item"><label>归属仓库 <span class="required">*</span></label>
+                    <select id="f_warehouse">
+                        <option value="新库房">新库房</option>
+                        <option value="老库房">老库房</option>
+                        <option value="无">无</option>
+                    </select>
+                </div>
+
+                <!-- 换出商品 -->
+                <div class="form-item full">
+                    <fieldset class="exchange-fieldset exchange-out">
+                        <legend>🔴 换出商品（客户退回）</legend>
+                        <div class="form-grid">
+                            <div class="form-item"><label>换出-品牌 <span class="required">*</span></label>
+                                <input list="f_outBrand_list" id="f_outBrand" placeholder="请输入或选择" oninput="onExchangeBrandInput('out')">
+                                <datalist id="f_outBrand_list">${brandOpts}</datalist>
+                            </div>
+                            <div class="form-item"><label>换出-商品名称</label>
+                                <input list="f_outGoodsName_list" id="f_outGoodsName" placeholder="请输入或选择" oninput="onExchangeNameInput('out')">
+                                <datalist id="f_outGoodsName_list"></datalist>
+                            </div>
+                            <div class="form-item"><label>换出-型号</label>
+                                <input list="f_outModel_list" id="f_outModel" placeholder="请输入或选择">
+                                <datalist id="f_outModel_list"></datalist>
+                            </div>
+                            <div class="form-item"><label>换出-数量 <span class="required">*</span></label>
+                                <input id="f_outQuantity" type="number" value="1" min="1">
+                            </div>
+                        </div>
+                    </fieldset>
+                </div>
+
+                <!-- 换入商品 -->
+                <div class="form-item full">
+                    <fieldset class="exchange-fieldset exchange-in">
+                        <legend>🟢 换入商品（给客户的新货）</legend>
+                        <div class="form-grid">
+                            <div class="form-item"><label>换入-品牌 <span class="required">*</span></label>
+                                <input list="f_inBrand_list" id="f_inBrand" placeholder="请输入或选择" oninput="onExchangeBrandInput('in')">
+                                <datalist id="f_inBrand_list">${brandOpts}</datalist>
+                            </div>
+                            <div class="form-item"><label>换入-商品名称</label>
+                                <input list="f_inGoodsName_list" id="f_inGoodsName" placeholder="请输入或选择" oninput="onExchangeNameInput('in')">
+                                <datalist id="f_inGoodsName_list"></datalist>
+                            </div>
+                            <div class="form-item"><label>换入-型号</label>
+                                <input list="f_inModel_list" id="f_inModel" placeholder="请输入或选择">
+                                <datalist id="f_inModel_list"></datalist>
+                            </div>
+                            <div class="form-item"><label>换入-数量 <span class="required">*</span></label>
+                                <input id="f_inQuantity" type="number" value="1" min="1">
+                            </div>
+                        </div>
+                    </fieldset>
+                </div>
+
+                <div class="form-item full"><label>备注</label><textarea id="f_remark" rows="2"></textarea></div>
+            </div>`;
+            }
+
+            // 普通零售表单（订单、开单、退货）
             return `
             <div class="form-grid">
                 <div class="form-item"><label>单号</label><input id="f_orderNo" readonly></div>
@@ -3157,6 +3310,9 @@
                 <div class="form-item"><label>商品规格型号</label>
                     <input list="f_model_list" id="f_model" placeholder="请输入或选择">
                     <datalist id="f_model_list"></datalist>
+                </div>
+                <div class="form-item"><label>数量 <span class="required">*</span></label>
+                    <input id="f_quantity" type="number" value="1" min="1">
                 </div>
                 <div class="form-item"><label>销售价格</label><input id="f_sellPrice" type="number" step="0.01"></div>
                 <div class="form-item"><label>零售价格</label><input id="f_retailPrice" type="number" step="0.01"></div>
@@ -3220,6 +3376,38 @@
 
                 <div class="form-item full"><label>备注</label><textarea id="f_remark" rows="2"></textarea></div>
             </div>`;
+        }
+
+        function onExchangeBrandInput(type) {
+            const brandEl = document.getElementById(`f_${type}Brand`);
+            const nameEl = document.getElementById(`f_${type}GoodsName`);
+            const modelEl = document.getElementById(`f_${type}Model`);
+            if (!brandEl || !nameEl || !modelEl) return;
+            const brand = brandEl.value;
+            const names = getProductNamesByBrand(brand);
+            const nameDatalist = document.getElementById(`f_${type}GoodsName_list`);
+            if (nameDatalist) {
+                nameDatalist.innerHTML = buildDatalistOptions(names);
+            }
+            const modelDatalist = document.getElementById(`f_${type}Model_list`);
+            if (modelDatalist) modelDatalist.innerHTML = '';
+            if (nameEl.value) {
+                onExchangeNameInput(type);
+            }
+        }
+
+        function onExchangeNameInput(type) {
+            const brandEl = document.getElementById(`f_${type}Brand`);
+            const nameEl = document.getElementById(`f_${type}GoodsName`);
+            const modelEl = document.getElementById(`f_${type}Model`);
+            if (!brandEl || !nameEl || !modelEl) return;
+            const brand = brandEl.value;
+            const name = nameEl.value;
+            const models = getProductModelsByBrandName(brand, name);
+            const modelDatalist = document.getElementById(`f_${type}Model_list`);
+            if (modelDatalist) {
+                modelDatalist.innerHTML = buildDatalistOptions(models);
+            }
         }
 
         function onBrandInput(type) {
@@ -3303,6 +3491,9 @@
                 </div>
                 <div class="form-item"><label>商品名称</label><input id="f_goodsName"></div>
                 <div class="form-item"><label>商品规格型号</label><input id="f_model"></div>
+                <div class="form-item"><label>数量 <span class="required">*</span></label>
+                    <input id="f_quantity" type="number" value="1" min="1">
+                </div>
                 <div class="form-item"><label>销售价格</label><input id="f_sellPrice" type="number" step="0.01"></div>
                 <div class="form-item"><label>零售价格</label><input id="f_retailPrice" type="number" step="0.01"></div>
                 <div class="form-item"><label>折扣</label><input id="f_discount" readonly></div>
@@ -3424,10 +3615,14 @@
                 if (el) {
                     if (el.tagName === 'INPUT' && el.hasAttribute('list')) {
                         el.value = row[key] || '';
-                        if (key === 'brand') {
-                            onBrandInput(dataType);
-                        } else if (key === 'goodsName') {
-                            onNameInput(dataType);
+                        if (key === 'brand' || key === 'outBrand' || key === 'inBrand') {
+                            if (key === 'brand') onBrandInput(dataType);
+                            else if (key === 'outBrand') onExchangeBrandInput('out');
+                            else if (key === 'inBrand') onExchangeBrandInput('in');
+                        } else if (key === 'goodsName' || key === 'outGoodsName' || key === 'inGoodsName') {
+                            if (key === 'goodsName') onNameInput(dataType);
+                            else if (key === 'outGoodsName') onExchangeNameInput('out');
+                            else if (key === 'inGoodsName') onExchangeNameInput('in');
                         }
                     } else if (el.tagName === 'SELECT') {
                         const options = el.options;
@@ -3447,17 +3642,21 @@
                     }
                 }
             });
-            const brandEl = document.getElementById('f_brand');
-            if (brandEl) {
-                const evt = new Event('input');
-                brandEl.dispatchEvent(evt);
-            }
-            setTimeout(() => {
-                const nameEl = document.getElementById('f_goodsName');
-                if (nameEl) {
+            ['brand', 'outBrand', 'inBrand'].forEach(key => {
+                const el = document.getElementById('f_' + key);
+                if (el) {
                     const evt = new Event('input');
-                    nameEl.dispatchEvent(evt);
+                    el.dispatchEvent(evt);
                 }
+            });
+            setTimeout(() => {
+                ['goodsName', 'outGoodsName', 'inGoodsName'].forEach(key => {
+                    const el = document.getElementById('f_' + key);
+                    if (el) {
+                        const evt = new Event('input');
+                        el.dispatchEvent(evt);
+                    }
+                });
             }, 50);
 
             document.getElementById('modal-title').textContent = '编辑记录';
@@ -3467,13 +3666,51 @@
             `;
         }
 
-        // [修改] saveRow 增加品牌和仓库必填验证（三维匹配需要）
         async function saveRow(dataType) {
             const row = collectFormData();
 
-            // ---- 品牌必填验证（适用于有 brand 字段的单据类型） ----
+            // ---- 零售换货特殊处理 ----
+            if (dataType === 'retailExchange') {
+                if (!row.outBrand || row.outBrand.trim() === '') {
+                    alert('请填写换出商品的品牌（必填）');
+                    return;
+                }
+                if (!row.outQuantity || parseInt(row.outQuantity) < 1) {
+                    alert('请填写换出商品的数量（至少1）');
+                    return;
+                }
+                if (!row.inBrand || row.inBrand.trim() === '') {
+                    alert('请填写换入商品的品牌（必填）');
+                    return;
+                }
+                if (!row.inQuantity || parseInt(row.inQuantity) < 1) {
+                    alert('请填写换入商品的数量（至少1）');
+                    return;
+                }
+                if (!row.warehouse || row.warehouse.trim() === '') {
+                    alert('请选择归属仓库（必填）');
+                    return;
+                }
+                row.orderNo = row.orderNo || genOrderNo('ZH-', dataType);
+                row.orderDate = row.orderDate || new Date().toISOString().split('T')[0];
+
+                if (!appData[dataType]) appData[dataType] = [];
+                appData[dataType].push(row);
+                await saveAppData();
+                closeModal();
+                renderTable(dataType);
+                await updateStock();
+                if (appData.currentUser) {
+                    if (!appData.userLogs[appData.currentUser]) appData.userLogs[appData.currentUser] = [];
+                    appData.userLogs[appData.currentUser].push({ time: new Date().toLocaleString(), action: `新增 ${dataType} 记录` });
+                    await saveAppData();
+                }
+                return;
+            }
+
+            // ---- 普通零售/采购验证 ----
             const brandRequiredTypes = ['purchaseIn', 'purchaseExchange', 'purchaseReturn', 'retailOrder', 'retailSell',
-                'retailExchange', 'retailReturn', 'sampleDisplay'
+                'retailReturn', 'sampleDisplay'
             ];
             if (brandRequiredTypes.includes(dataType)) {
                 if (!row.brand || row.brand.trim() === '') {
@@ -3482,9 +3719,8 @@
                 }
             }
 
-            // ---- 仓库必填验证（适用于有 warehouse 字段的单据类型） ----
             const warehouseRequiredTypes = ['purchaseIn', 'purchaseExchange', 'purchaseReturn', 'retailOrder', 'retailSell',
-                'retailExchange', 'retailReturn', 'sampleSell'
+                'retailReturn', 'sampleSell'
             ];
             if (warehouseRequiredTypes.includes(dataType)) {
                 if (!row.warehouse || row.warehouse.trim() === '') {
@@ -3492,6 +3728,8 @@
                     return;
                 }
             }
+
+            if (row.quantity === '' || row.quantity === undefined) row.quantity = 1;
 
             if (row.quantity && row.price) row.amount = (row.quantity * row.price).toFixed(2);
             if (row.sellPrice && row.retailPrice) row.discount = (row.sellPrice / row.retailPrice).toFixed(2);
@@ -3511,12 +3749,47 @@
             }
         }
 
-        // [修改] updateRow 增加品牌和仓库必填验证（三维匹配需要）
         async function updateRow(dataType, idx) {
             const row = collectFormData();
 
+            if (dataType === 'retailExchange') {
+                if (!row.outBrand || row.outBrand.trim() === '') {
+                    alert('请填写换出商品的品牌（必填）');
+                    return;
+                }
+                if (!row.outQuantity || parseInt(row.outQuantity) < 1) {
+                    alert('请填写换出商品的数量（至少1）');
+                    return;
+                }
+                if (!row.inBrand || row.inBrand.trim() === '') {
+                    alert('请填写换入商品的品牌（必填）');
+                    return;
+                }
+                if (!row.inQuantity || parseInt(row.inQuantity) < 1) {
+                    alert('请填写换入商品的数量（至少1）');
+                    return;
+                }
+                if (!row.warehouse || row.warehouse.trim() === '') {
+                    alert('请选择归属仓库（必填）');
+                    return;
+                }
+                row.orderDate = row.orderDate || new Date().toISOString().split('T')[0];
+
+                appData[dataType][idx] = row;
+                await saveAppData();
+                closeModal();
+                renderTable(dataType);
+                await updateStock();
+                if (appData.currentUser) {
+                    if (!appData.userLogs[appData.currentUser]) appData.userLogs[appData.currentUser] = [];
+                    appData.userLogs[appData.currentUser].push({ time: new Date().toLocaleString(), action: `编辑 ${dataType} 记录` });
+                    await saveAppData();
+                }
+                return;
+            }
+
             const brandRequiredTypes = ['purchaseIn', 'purchaseExchange', 'purchaseReturn', 'retailOrder', 'retailSell',
-                'retailExchange', 'retailReturn', 'sampleDisplay'
+                'retailReturn', 'sampleDisplay'
             ];
             if (brandRequiredTypes.includes(dataType)) {
                 if (!row.brand || row.brand.trim() === '') {
@@ -3526,7 +3799,7 @@
             }
 
             const warehouseRequiredTypes = ['purchaseIn', 'purchaseExchange', 'purchaseReturn', 'retailOrder', 'retailSell',
-                'retailExchange', 'retailReturn', 'sampleSell'
+                'retailReturn', 'sampleSell'
             ];
             if (warehouseRequiredTypes.includes(dataType)) {
                 if (!row.warehouse || row.warehouse.trim() === '') {
@@ -3534,6 +3807,8 @@
                     return;
                 }
             }
+
+            if (row.quantity === '' || row.quantity === undefined) row.quantity = 1;
 
             if (row.quantity && row.price) row.amount = (row.quantity * row.price).toFixed(2);
             if (row.sellPrice && row.retailPrice) row.discount = (row.sellPrice / row.retailPrice).toFixed(2);
@@ -3727,8 +4002,10 @@
         }
 
         // ===================================================================
-        // 8. 库存自动更新（三维匹配：品牌+型号+仓库）
-        // 【修改】零售订单和零售开单根据数量（quantity）扣减库存，而不是固定减1
+        // 8. 库存自动更新（核心修改）
+        // 账面库存：只有零售开单才减少（真正卖出）
+        // 销售订货：只有零售订单才增加（预定未提货）
+        // 可用库存 = 账面库存 - 销售订货（可以为负数）
         // ===================================================================
         async function updateStock() {
             const stockMap = {};
@@ -3740,7 +4017,7 @@
                 return brand + '|' + model + '|' + warehouse;
             }
 
-            // ---- 采购入库：增加库存 ----
+            // ---- 采购入库：增加账面库存 ----
             (appData.purchaseIn || []).forEach(item => {
                 const key = getStockKey(item);
                 if (!stockMap[key]) {
@@ -3756,7 +4033,7 @@
                 stockMap[key].bookStock += Number(item.quantity) || 0;
             });
 
-            // ---- 采购退货：减少库存 ----
+            // ---- 采购退货：减少账面库存 ----
             (appData.purchaseReturn || []).forEach(item => {
                 const key = getStockKey(item);
                 if (!stockMap[key]) {
@@ -3772,7 +4049,7 @@
                 stockMap[key].bookStock -= Number(item.quantity) || 0;
             });
 
-            // ---- 零售订单：减少库存（按数量扣减） ----
+            // ---- 零售订单：只增加销售订货（账面库存不变） ----
             (appData.retailOrder || []).forEach(item => {
                 const key = getStockKey(item);
                 if (!stockMap[key]) {
@@ -3785,12 +4062,11 @@
                         salesOrder: 0
                     };
                 }
-                // ★★★ 按数量扣减，默认为1 ★★★
                 const qty = Number(item.quantity) || 1;
-                stockMap[key].bookStock -= qty;
+                stockMap[key].salesOrder += qty;
             });
 
-            // ---- 零售开单：减少库存（按数量扣减） ----
+            // ---- 零售开单：减少账面库存（真正卖出） ----
             (appData.retailSell || []).forEach(item => {
                 const key = getStockKey(item);
                 if (!stockMap[key]) {
@@ -3803,12 +4079,11 @@
                         salesOrder: 0
                     };
                 }
-                // ★★★ 按数量扣减，默认为1 ★★★
                 const qty = Number(item.quantity) || 1;
                 stockMap[key].bookStock -= qty;
             });
 
-            // ---- 零售退货：增加库存（按数量增加） ----
+            // ---- 零售退货：增加账面库存 ----
             (appData.retailReturn || []).forEach(item => {
                 const key = getStockKey(item);
                 if (!stockMap[key]) {
@@ -3825,7 +4100,38 @@
                 stockMap[key].bookStock += qty;
             });
 
-            // ---- 门店上样：减少库存 ----
+            // ---- 零售换货：换出商品减少库存，换入商品增加库存 ----
+            (appData.retailExchange || []).forEach(item => {
+                const outKey = (item.outBrand || '无品牌') + '|' + (item.outModel || '无型号') + '|' + (item.warehouse || '新库房');
+                if (!stockMap[outKey]) {
+                    stockMap[outKey] = {
+                        brand: item.outBrand || '无品牌',
+                        goodsName: item.outGoodsName || '',
+                        model: item.outModel || '无型号',
+                        warehouse: item.warehouse || '新库房',
+                        bookStock: 0,
+                        salesOrder: 0
+                    };
+                }
+                const outQty = Number(item.outQuantity) || 1;
+                stockMap[outKey].bookStock -= outQty;
+
+                const inKey = (item.inBrand || '无品牌') + '|' + (item.inModel || '无型号') + '|' + (item.warehouse || '新库房');
+                if (!stockMap[inKey]) {
+                    stockMap[inKey] = {
+                        brand: item.inBrand || '无品牌',
+                        goodsName: item.inGoodsName || '',
+                        model: item.inModel || '无型号',
+                        warehouse: item.warehouse || '新库房',
+                        bookStock: 0,
+                        salesOrder: 0
+                    };
+                }
+                const inQty = Number(item.inQuantity) || 1;
+                stockMap[inKey].bookStock += inQty;
+            });
+
+            // ---- 门店上样：减少账面库存 ----
             (appData.sampleDisplay || []).forEach(item => {
                 const key = getStockKey(item);
                 if (!stockMap[key]) {
@@ -3841,7 +4147,7 @@
                 stockMap[key].bookStock -= Number(item.quantity) || 0;
             });
 
-            // ---- 样机销售：减少库存 ----
+            // ---- 样机销售：减少账面库存 ----
             (appData.sampleSell || []).forEach(item => {
                 const key = getStockKey(item);
                 if (!stockMap[key]) {
@@ -3854,34 +4160,12 @@
                         salesOrder: 0
                     };
                 }
-                stockMap[key].bookStock -= 1;
-            });
-
-            // ---- 销售订货量（按三维匹配汇总零售订单，按数量汇总） ----
-            const salesOrderMap = {};
-            (appData.retailOrder || []).forEach(item => {
-                const key = getStockKey(item);
-                if (!salesOrderMap[key]) salesOrderMap[key] = 0;
                 const qty = Number(item.quantity) || 1;
-                salesOrderMap[key] += qty;
-            });
-            Object.keys(salesOrderMap).forEach(key => {
-                if (stockMap[key]) {
-                    stockMap[key].salesOrder = salesOrderMap[key];
-                } else {
-                    const parts = key.split('|');
-                    stockMap[key] = {
-                        brand: parts[0] || '无品牌',
-                        goodsName: '',
-                        model: parts[1] || '无型号',
-                        warehouse: parts[2] || '新库房',
-                        bookStock: 0,
-                        salesOrder: salesOrderMap[key]
-                    };
-                }
+                stockMap[key].bookStock -= qty;
             });
 
             // ---- 生成最终库存数组 ----
+            // 可用库存 = 账面库存 - 销售订货（可以为负数）
             appData.stock = Object.values(stockMap).map(s => ({
                 ...s,
                 availableStock: s.bookStock - s.salesOrder
@@ -3891,23 +4175,18 @@
         }
 
         // ===================================================================
-        // 9. Excel 导入（含品牌/仓库必填验证，以及WPS日期+2天修正）
+        // 9. Excel 导入
         // ===================================================================
         function importExcel(dataType) {
             document.getElementById('file-import').click();
         }
 
-        /**
-         * 将Excel日期序列号转为 yyyy-MM-dd 格式
-         * 【核心修改】WPS导出的日期比标准Excel早2天，这里加2天补偿
-         */
         function excelSerialToDate(serial) {
             if (typeof serial !== 'number' || serial < 0 || serial > 60000) return serial;
             let days = serial;
             if (serial >= 61) {
                 days = serial - 1;
             }
-            // ★★★ WPS日期修正：加2天补偿 ★★★
             days = days + 2;
             const epoch = new Date(1899, 11, 31);
             const date = new Date(epoch.getTime() + days * 86400000);
@@ -3934,9 +4213,10 @@
                 let dateFields = [];
                 if (dataType === 'purchaseIn' || dataType === 'purchaseExchange' || dataType === 'purchaseReturn') {
                     dateFields = ['purchaseDate', 'receiveDate', 'invoiceDate'];
-                } else if (dataType === 'retailOrder' || dataType === 'retailSell' || dataType === 'retailExchange' ||
-                    dataType === 'retailReturn') {
+                } else if (dataType === 'retailOrder' || dataType === 'retailSell' || dataType === 'retailReturn') {
                     dateFields = ['orderDate', 'installDate', 'salesRecordDate', 'invoiceDate', 'posDate'];
+                } else if (dataType === 'retailExchange') {
+                    dateFields = ['orderDate'];
                 } else if (dataType === 'sampleDisplay') {
                     dateFields = ['displayDate'];
                 } else if (dataType === 'sampleSell') {
@@ -3953,9 +4233,8 @@
                         if (colMap[k]) mapped[colMap[k]] = row[k];
                     });
 
-                    // ---- 品牌必填验证 ----
                     const brandRequiredTypes = ['purchaseIn', 'purchaseExchange', 'purchaseReturn', 'retailOrder',
-                        'retailSell', 'retailExchange', 'retailReturn', 'sampleDisplay'
+                        'retailSell', 'retailReturn', 'sampleDisplay'
                     ];
                     if (brandRequiredTypes.includes(dataType)) {
                         if (!mapped.brand || mapped.brand.toString().trim() === '') {
@@ -3964,12 +4243,22 @@
                         }
                     }
 
-                    // ---- 仓库必填验证 ----
                     const warehouseRequiredTypes = ['purchaseIn', 'purchaseExchange', 'purchaseReturn', 'retailOrder',
-                        'retailSell', 'retailExchange', 'retailReturn', 'sampleSell'
+                        'retailSell', 'retailReturn', 'sampleSell'
                     ];
                     if (warehouseRequiredTypes.includes(dataType)) {
                         if (!mapped.warehouse || mapped.warehouse.toString().trim() === '') {
+                            skipped++;
+                            return;
+                        }
+                    }
+
+                    if (dataType === 'retailExchange') {
+                        if (!mapped.outBrand || !mapped.inBrand) {
+                            skipped++;
+                            return;
+                        }
+                        if (!mapped.outQuantity || !mapped.inQuantity) {
                             skipped++;
                             return;
                         }
@@ -4006,13 +4295,14 @@
                         mapped.orderNo = genOrderNo(prefixMap[dataType] || 'IM-', dataType);
                     }
 
+                    if (!mapped.warehouse) mapped.warehouse = '新库房';
+                    if (mapped.quantity === '' || mapped.quantity === undefined) mapped.quantity = 1;
+
                     if (mapped.quantity && mapped.price) mapped.amount = (mapped.quantity * mapped.price).toFixed(2);
                     if (mapped.sellPrice && mapped.retailPrice) mapped.discount = (mapped.sellPrice / mapped
                         .retailPrice).toFixed(2);
                     if (mapped.sellPrice && mapped.costPrice) mapped.profit = (mapped.sellPrice - mapped.costPrice)
                         .toFixed(2);
-
-                    if (!mapped.warehouse) mapped.warehouse = '新库房';
 
                     if (!appData[dataType]) appData[dataType] = [];
                     appData[dataType].push(mapped);
@@ -4023,7 +4313,7 @@
                 await updateStock();
                 renderTable(dataType);
                 let msg = `成功导入 ${imported} 条记录`;
-                if (skipped > 0) msg += `，跳过 ${skipped} 条（缺少品牌或仓库）`;
+                if (skipped > 0) msg += `，跳过 ${skipped} 条（缺少必填字段）`;
                 alert(msg);
             };
             reader.readAsArrayBuffer(file);
@@ -4031,7 +4321,7 @@
         }
 
         // ===================================================================
-        // 10. 导出功能（业务模块）
+        // 10. 导出功能
         // ===================================================================
         function exportExcel(dataType) {
             showExportConfig(dataType);
@@ -4046,6 +4336,7 @@
 
             let fieldHtml = '';
             cols.forEach((c, idx) => {
+                if (c.key === '_actions') return;
                 fieldHtml += `
                     <label>
                         <input type="checkbox" class="export-field-cb" data-key="${c.key}" value="${c.key}" checked>
@@ -4061,7 +4352,7 @@
                     <span style="font-weight:500;font-size:14px;">选择要导出的字段：</span>
                     <span class="select-all-link" onclick="toggleExportFields(true)">全选</span>
                     <span class="select-all-link" onclick="toggleExportFields(false)">取消全选</span>
-                    <span class="field-count">已选 <span id="selected-count">${cols.length}</span> 个字段</span>
+                    <span class="field-count">已选 <span id="selected-count">${cols.filter(c=>c.key!=='_actions').length}</span> 个字段</span>
                 </div>
                 <div class="export-field-grid" id="export-field-grid">
                     ${fieldHtml}
@@ -4124,7 +4415,7 @@
         }
 
         function generateExcel(dataType) {
-            const cols = tableColumns[dataType];
+            const cols = tableColumns[dataType].filter(c => c.key !== '_actions');
             let data = getFilteredData(dataType);
 
             const selectedKeys = [];
@@ -4146,7 +4437,7 @@
 
             const numericKeys = ['quantity', 'price', 'amount', 'invoiceAmount', 'sellPrice', 'retailPrice',
                 'payAmount', 'costPrice', 'profit', 'bookStock', 'salesOrder', 'availableStock', 'posAmount',
-                'subsidyAmount'
+                'subsidyAmount', 'outQuantity', 'inQuantity'
             ];
             const numericCols = selectedCols.filter(c => numericKeys.includes(c.key));
 
@@ -4440,10 +4731,13 @@
         window.autoFillByPhone = autoFillByPhone;
         window.onBrandInput = onBrandInput;
         window.onNameInput = onNameInput;
+        window.onExchangeBrandInput = onExchangeBrandInput;
+        window.onExchangeNameInput = onExchangeNameInput;
         window.toggleExportFields = toggleExportFields;
         window.updateExportFieldCount = updateExportFieldCount;
         window.generateExcel = generateExcel;
         window.jumpToRetailByProduct = jumpToRetailByProduct;
+        window.viewRetailSell = viewRetailSell;
         window.openBaseAddForm = openBaseAddForm;
         window.saveBaseRow = saveBaseRow;
         window.editBaseRow = editBaseRow;
